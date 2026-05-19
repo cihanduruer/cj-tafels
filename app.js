@@ -53,18 +53,16 @@ function resizeCanvas() {
 function layoutGates() {
   if (!state.gates.length) return;
   const n = state.gates.length;
-  const terminalW = Math.min(70, W * 0.10);
-  const gateW = Math.min(170, W * 0.24);
-  const topReserve = 70;
-  const bottomReserve = Math.max(120, H * 0.30);
-  const available = H - topReserve - bottomReserve;
+  // Gates are positioned horizontally below the runway (like parking bays)
+  const gateW = Math.min(130, (W - 60) / n - 12);
+  const gateH = Math.min(80, H * 0.15);
   const gap = 14;
-  const gateH = Math.min(64, (available - gap * (n - 1)) / n);
-  const totalH = gateH * n + gap * (n - 1);
-  const startY = topReserve + Math.max(0, (available - totalH) / 2);
+  const totalW = gateW * n + gap * (n - 1);
+  const startX = (W - totalW) / 2;
+  const gateY = H * 0.72;
   state.gates.forEach((g, i) => {
-    g.x = terminalW;
-    g.y = startY + i * (gateH + gap);
+    g.x = startX + i * (gateW + gap);
+    g.y = gateY;
     g.w = gateW;
     g.h = gateH;
   });
@@ -202,21 +200,21 @@ function updatePlane(now) {
   const p = state.plane;
   const elapsed = now - state.phaseStart;
 
-  // Approaching: plane descends slowly from upper-right toward runway level over 3s
+  // Approaching: plane enters from top, descends toward runway over 3s
   if (state.phase === 'approaching') {
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInOutCubic(t);
-    const startX = W + 80;
-    const startY = H * 0.08;
-    const endX = W * 0.35;              // approaching from right to center-left
-    const endY = H * 0.55;              // near runway level
-    // Smooth descent path
+    // Enter from upper-right, fly diagonally to runway center
+    const startX = W * 0.85;
+    const startY = -60;
+    const endX = W * 0.5;
+    const endY = H * 0.48; // just above runway
     p.x = startX + (endX - startX) * e;
     p.y = startY + (endY - startY) * easeOutCubic(t);
-    // gentle nose-down during descent, leveling out at end
-    p.angle = -0.12 * (1 - e);
-    p.scale = 1;
-    // Time's up: no answer → pass through
+    // Heading: toward lower-left (top-down angle: nose direction)
+    const baseAngle = Math.atan2(endY - startY, endX - startX);
+    p.angle = baseAngle;
+    p.scale = 0.6 + 0.4 * easeOutCubic(t); // grow as it gets closer
     if (t >= 1) {
       onTimeout();
     }
@@ -225,41 +223,43 @@ function updatePlane(now) {
     const e = easeInOutCubic(t);
     const target = state.landTarget;
     const sx = state.landFrom.x, sy = state.landFrom.y;
-    const tx = target.x + target.w + 38;
-    const ty = target.y + target.h / 2;
-    const dx = sx - tx;
-    const c1x = sx - dx * 0.10;
-    const c1y = sy + (ty - sy) * 0.55;
-    const c2x = tx + dx * 0.45;
-    const c2y = ty;
+    const tx = target.x + target.w / 2;
+    const ty = target.y - 10; // just above the gate
+    // Smooth cubic bezier: arc down to gate
+    const c1x = sx;
+    const c1y = sy + (ty - sy) * 0.4;
+    const c2x = tx;
+    const c2y = sy + (ty - sy) * 0.7;
     const mt = 1 - e;
     const x = mt*mt*mt*sx + 3*mt*mt*e*c1x + 3*mt*e*e*c2x + e*e*e*tx;
     const y = mt*mt*mt*sy + 3*mt*mt*e*c1y + 3*mt*e*e*c2y + e*e*e*ty;
-    const tdx = 3*mt*mt*(c1x - sx) + 6*mt*e*(c2x - c1x) + 3*e*e*(tx - c2x);
-    const tdy = 3*mt*mt*(c1y - sy) + 6*mt*e*(c2y - c1y) + 3*e*e*(ty - c2y);
+    // Tangent for angle
+    const tdx = 3*mt*mt*(c1x-sx) + 6*mt*e*(c2x-c1x) + 3*e*e*(tx-c2x);
+    const tdy = 3*mt*mt*(c1y-sy) + 6*mt*e*(c2y-c1y) + 3*e*e*(ty-c2y);
     p.x = x;
     p.y = y;
-    const targetAngle = Math.atan2(tdy, tdx) + Math.PI;
-    const settle = Math.max(0, (e - 0.75) / 0.25);
-    p.angle = lerpAngle(targetAngle, 0, easeOutCubic(settle));
-    p.scale = 1 - 0.5 * easeInOutCubic(t);
+    // Smoothly settle to pointing down (PI/2) at the end
+    const moveAngle = Math.atan2(tdy, tdx);
+    const settle = Math.max(0, (e - 0.7) / 0.3);
+    p.angle = lerpAngle(moveAngle, Math.PI / 2, easeOutCubic(settle));
+    p.scale = 1 - 0.4 * easeInOutCubic(t); // shrink as it parks
     if (t >= 1) {
-      state.parkedAt.push({ x: tx, y: ty, scale: 0.5, angle: 0 });
+      state.parkedAt.push({ x: tx, y: ty, scale: 0.55, angle: Math.PI / 2 });
       state.phase = 'idle';
       p.visible = false;
       setTimeout(nextQuestion, 800);
     }
   } else if (state.phase === 'passthru') {
-    // Plane continues straight through and exits left
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInCubic(t);
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    const tx = -160;
-    const ty = sy + 20; // slight sink as it passes
+    // Continue past → exit bottom-left
+    const tx = -100;
+    const ty = H + 80;
     p.x = sx + (tx - sx) * e;
-    p.y = sy + (ty - sy) * easeOutCubic(t);
-    p.angle = 0; // level flight
-    p.scale = 1 - 0.15 * t;
+    p.y = sy + (ty - sy) * e;
+    p.angle = Math.atan2(ty - sy, tx - sx);
+    p.scale = 1 - 0.3 * t;
     if (t >= 1) {
       p.visible = false;
       state.phase = 'idle';
@@ -269,274 +269,362 @@ function updatePlane(now) {
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInCubic(t);
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    const tx = -140;
-    const ty = -80;
-    const cx = sx - Math.abs(sx - tx) * 0.25;
-    const cy = Math.min(sy, ty) - 80;
+    // Climb back up → exit top-left
+    const tx = -100;
+    const ty = -100;
+    const cx = sx + (tx - sx) * 0.3;
+    const cy = sy - Math.abs(sy - ty) * 0.5;
     const mt = 1 - e;
     p.x = mt*mt*sx + 2*mt*e*cx + e*e*tx;
     p.y = mt*mt*sy + 2*mt*e*cy + e*e*ty;
-    const tdx = 2*mt*(cx - sx) + 2*e*(tx - cx);
-    const tdy = 2*mt*(cy - sy) + 2*e*(ty - cy);
-    p.angle = Math.atan2(tdy, tdx) + Math.PI;
-    p.scale = 1 - 0.35 * easeInOutCubic(t);
+    const tdx = 2*mt*(cx-sx) + 2*e*(tx-cx);
+    const tdy = 2*mt*(cy-sy) + 2*e*(ty-cy);
+    p.angle = Math.atan2(tdy, tdx);
+    p.scale = 1 - 0.4 * easeInOutCubic(t);
     if (t >= 1) {
       p.visible = false;
       state.phase = 'idle';
       setTimeout(nextQuestion, 200);
     }
   } else if (state.phase === 'parked') {
-    // stay where we ended
+    // stay
   }
 }
 
-// === Drawing ===
+// === Drawing (top-down bird's eye view) ===
 function draw() {
-  // Sky
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-  skyGrad.addColorStop(0, '#87ceeb');
-  skyGrad.addColorStop(0.6, '#cfeeff');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, W, H);
-
-  // Drifting clouds (slow horizontal movement, wrap around)
   const now = performance.now() / 1000;
-  const cloudDefs = [
-    { baseX: 0.15, y: 0.15, s: 0.9, speed: 8 },
-    { baseX: 0.70, y: 0.10, s: 1.3, speed: 5 },
-    { baseX: 0.45, y: 0.22, s: 0.7, speed: 11 },
-    { baseX: 0.85, y: 0.30, s: 1.0, speed: 6 },
-  ];
-  cloudDefs.forEach((c) => {
-    const span = W + 200;
-    let x = (c.baseX * W - now * c.speed) % span;
-    if (x < -100) x += span;
-    drawCloud(x, H * c.y, c.s);
-  });
 
-  // Ground (grass)
-  const groundY = H * 0.62;
-  const groundGrad = ctx.createLinearGradient(0, groundY, 0, H);
-  groundGrad.addColorStop(0, '#a8d572');
-  groundGrad.addColorStop(1, '#7bb348');
-  ctx.fillStyle = groundGrad;
-  ctx.fillRect(0, groundY, W, H - groundY);
+  // Grass background
+  ctx.fillStyle = '#5da84a';
+  ctx.fillRect(0, 0, W, H);
+  // Subtle grass texture lines
+  ctx.strokeStyle = 'rgba(80,140,60,0.3)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < W; i += 28) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0); ctx.lineTo(i, H);
+    ctx.stroke();
+  }
 
-  // Distant terminal building (back)
-  drawTerminal(groundY);
+  // Terminal building (bottom)
+  drawTerminal();
 
-  // Runway
-  drawRunway(groundY);
+  // Taxiway connecting runway to gates
+  drawTaxiways();
 
-  // Taxiways from runway to gates
-  drawTaxiways(groundY);
+  // Runway (horizontal, upper-middle)
+  drawRunway();
 
-  // Gates (parking spots)
+  // Gates (parking spots below runway)
   state.gates.forEach(drawGate);
 
-  // Parked planes (small)
+  // Parked planes at gates
   state.parkedAt.forEach((pp) => {
-    drawPlane(pp.x, pp.y, pp.angle || 0, pp.scale || 0.5);
+    drawPlaneTopDown(pp.x, pp.y, pp.angle, pp.scale);
   });
-
-  // Question banner at top
-  drawBanner();
-
-  // Countdown bar while approaching
-  if (state.phase === 'approaching') drawCountdown();
-
-  // "Tafel van X" placard top-left
-  drawTablePlacard();
 
   // Active plane
   if (state.plane.visible) {
     const p = state.plane;
-    drawPlane(p.x, p.y, p.angle, p.scale);
+    drawPlaneTopDown(p.x, p.y, p.angle, p.scale);
   }
+
+  // Transparent drifting clouds (on top of everything)
+  drawClouds(now);
+
+  // UI overlays
+  drawBanner();
+  if (state.phase === 'approaching') drawCountdown();
+  drawTablePlacard();
 }
 
-function drawCloud(x, y, s) {
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.beginPath();
-  ctx.arc(x, y, 18 * s, 0, Math.PI * 2);
-  ctx.arc(x + 18 * s, y + 4 * s, 14 * s, 0, Math.PI * 2);
-  ctx.arc(x - 18 * s, y + 4 * s, 14 * s, 0, Math.PI * 2);
-  ctx.arc(x + 6 * s, y - 8 * s, 12 * s, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawTerminal(groundY) {
-  // Large terminal building at the bottom of the scene
-  const bh = Math.min(90, H * 0.16);
-  const bw = W * 0.65;
-  const bx = (W - bw) / 2;
-  const by = H - bh;
-  // building body
-  ctx.fillStyle = '#e0e4e8';
-  ctx.fillRect(bx, by, bw, bh);
-  ctx.strokeStyle = '#888';
+function drawRunway() {
+  const ry = H * 0.45;
+  const rh = Math.max(28, H * 0.06);
+  const rx = W * 0.08;
+  const rw = W * 0.84;
+  // Asphalt
+  ctx.fillStyle = '#3a3a3a';
+  ctx.fillRect(rx, ry, rw, rh);
+  // White edge lines
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(rx, ry, rw, 3);
+  ctx.fillRect(rx, ry + rh - 3, rw, 3);
+  // Dashed center line
+  ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
-  ctx.strokeRect(bx, by, bw, bh);
-  // roof line
-  ctx.fillStyle = '#143b5e';
-  ctx.fillRect(bx - 4, by - 8, bw + 8, 10);
-  // windows row
-  ctx.fillStyle = '#5fb4d9';
-  const winW = 20, winH = 28, winGap = 12;
-  const winCount = Math.floor((bw - 30) / (winW + winGap));
-  const winStartX = bx + (bw - winCount * (winW + winGap) + winGap) / 2;
-  for (let i = 0; i < winCount; i++) {
-    ctx.fillRect(winStartX + i * (winW + winGap), by + 16, winW, winH);
+  ctx.setLineDash([20, 15]);
+  ctx.beginPath();
+  ctx.moveTo(rx, ry + rh / 2);
+  ctx.lineTo(rx + rw, ry + rh / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Threshold markings (left)
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(rx + 12, ry + 6 + i * (rh - 12) / 4, 30, 3);
   }
-  // AIRPORT sign
-  ctx.fillStyle = '#143b5e';
+  // Threshold markings (right)
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(rx + rw - 42, ry + 6 + i * (rh - 12) / 4, 30, 3);
+  }
+  // Runway numbers
+  ctx.fillStyle = '#fff';
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('\u2708 AIRPORT', bx + bw / 2, by + bh - 14);
-
-  // Control tower (right side of terminal)
-  const tw = 30, th = 100;
-  const tx = bx + bw - tw - 20;
-  const ty = by - th + 10;
-  // tower shaft
-  ctx.fillStyle = '#ccd';
-  ctx.fillRect(tx + 6, ty + 20, tw - 12, th - 20);
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(tx + 6, ty + 20, tw - 12, th - 20);
-  // tower cab (glass observation room)
-  ctx.fillStyle = '#143b5e';
-  ctx.fillRect(tx - 4, ty, tw + 8, 22);
-  ctx.fillStyle = '#5fb4d9';
-  ctx.fillRect(tx - 2, ty + 4, tw + 4, 14);
-  // beacon on top
-  ctx.fillStyle = '#ef476f';
-  ctx.beginPath();
-  ctx.arc(tx + tw / 2, ty - 5, 4, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillText('09', rx + 60, ry + rh / 2);
+  ctx.fillText('27', rx + rw - 60, ry + rh / 2);
 }
 
-function drawTaxiways(groundY) {
+function drawTaxiways() {
   if (!state.gates.length) return;
-  let maxRight = 0, minY = Infinity, maxY = -Infinity;
-  state.gates.forEach((g) => {
-    maxRight = Math.max(maxRight, g.x + g.w);
-    minY = Math.min(minY, g.y);
-    maxY = Math.max(maxY, g.y + g.h);
-  });
-  const taxiW = 30;
-  const mainX = maxRight + 28;
-  const topY = minY - 12;
-  const botY = groundY + 14; // top edge of runway
-
-  // asphalt apron under everything (subtle)
-  ctx.fillStyle = '#6b6f73';
-  ctx.fillRect(70, minY - 18, mainX + taxiW - 70 + 10, maxY - minY + 36);
-
-  // main vertical taxiway
+  const ry = H * 0.45;
+  const rh = Math.max(28, H * 0.06);
+  const taxiW = 20;
+  // Horizontal taxiway below runway
+  const taxiY = ry + rh + 10;
+  const taxiH = 20;
   ctx.fillStyle = '#555';
-  ctx.fillRect(mainX, topY, taxiW, botY - topY);
-  // spurs to each gate
-  state.gates.forEach((g) => {
-    const sy = g.y + g.h / 2 - taxiW / 2;
-    ctx.fillRect(g.x + g.w, sy, mainX - (g.x + g.w), taxiW);
-  });
-
-  // yellow dashed taxi centerlines
+  ctx.fillRect(W * 0.15, taxiY, W * 0.7, taxiH);
+  // Yellow centerline
   ctx.strokeStyle = '#ffd166';
   ctx.lineWidth = 2;
-  ctx.setLineDash([10, 7]);
-  // main centerline
+  ctx.setLineDash([12, 8]);
   ctx.beginPath();
-  ctx.moveTo(mainX + taxiW / 2, topY);
-  ctx.lineTo(mainX + taxiW / 2, botY);
+  ctx.moveTo(W * 0.15, taxiY + taxiH / 2);
+  ctx.lineTo(W * 0.85, taxiY + taxiH / 2);
   ctx.stroke();
-  // spur centerlines
-  state.gates.forEach((g) => {
-    const cy = g.y + g.h / 2;
-    ctx.beginPath();
-    ctx.moveTo(g.x + g.w, cy);
-    ctx.lineTo(mainX + taxiW / 2, cy);
-    ctx.stroke();
-  });
   ctx.setLineDash([]);
-
-  // edge stripes on apron border
-  ctx.strokeStyle = '#cfd2d6';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(70.5, minY - 17.5, mainX + taxiW - 70 + 9, maxY - minY + 35);
+  // Vertical spurs from taxiway down to each gate
+  state.gates.forEach((g) => {
+    const cx = g.x + g.w / 2;
+    const spurTop = taxiY + taxiH;
+    const spurBot = g.y;
+    ctx.fillStyle = '#555';
+    ctx.fillRect(cx - taxiW / 2, spurTop, taxiW, spurBot - spurTop);
+    // yellow centerline on spur
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(cx, spurTop);
+    ctx.lineTo(cx, spurBot);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
 }
 
-function drawRunway(groundY) {
-  const ry = groundY + 14;
-  const rh = 22;
-  // runway
-  ctx.fillStyle = '#3a3a3a';
-  ctx.fillRect(0, ry, W, rh);
-  // edge lines
-  ctx.strokeStyle = '#fff';
+function drawTerminal() {
+  // Terminal building at the very bottom
+  const th = Math.min(60, H * 0.10);
+  const tw = W * 0.8;
+  const tx = (W - tw) / 2;
+  const ty = H - th;
+  // Main building
+  ctx.fillStyle = '#d0d4d8';
+  ctx.fillRect(tx, ty, tw, th);
+  ctx.strokeStyle = '#888';
   ctx.lineWidth = 2;
+  ctx.strokeRect(tx, ty, tw, th);
+  // Roof edge
+  ctx.fillStyle = '#143b5e';
+  ctx.fillRect(tx, ty, tw, 5);
+  // Label
+  ctx.fillStyle = '#143b5e';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u2708 TERMINAL', tx + tw / 2, ty + th / 2);
+  // Control tower (circle, right side)
+  const ctX = tx + tw - 40;
+  const ctY = ty + th / 2;
+  ctx.fillStyle = '#8ac4e0';
   ctx.beginPath();
-  ctx.moveTo(0, ry + 2); ctx.lineTo(W, ry + 2);
-  ctx.moveTo(0, ry + rh - 2); ctx.lineTo(W, ry + rh - 2);
+  ctx.arc(ctX, ctY, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#143b5e';
+  ctx.lineWidth = 2;
   ctx.stroke();
-  // dashed center
-  ctx.setLineDash([18, 14]);
+  ctx.fillStyle = '#ef476f'; // beacon
   ctx.beginPath();
-  ctx.moveTo(0, ry + rh / 2); ctx.lineTo(W, ry + rh / 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.arc(ctX, ctY, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#143b5e';
+  ctx.font = 'bold 8px sans-serif';
+  ctx.fillText('TWR', ctX, ctY + 20);
 }
 
 function drawGate(g) {
   const r = 8;
+  // Gate apron pad
+  let bgColor = '#b8bcc0';
+  let borderColor = '#555';
+  if (g.status === 'correct') { bgColor = '#5be0b3'; borderColor = '#04835f'; }
+  else if (g.status === 'wrong') { bgColor = '#ff7a92'; borderColor = '#a52a47'; }
 
-  // gate base
-  let topColor = '#dcdcdc', botColor = '#b0b0b0', border = '#143b5e';
-  if (g.status === 'correct') { topColor = '#5be0b3'; botColor = '#06d6a0'; border = '#04835f'; }
-  else if (g.status === 'wrong') { topColor = '#ff7a92'; botColor = '#ef476f'; border = '#a52a47'; }
-
-  const grad = ctx.createLinearGradient(g.x, g.y, g.x + g.w, g.y);
-  grad.addColorStop(0, topColor);
-  grad.addColorStop(1, botColor);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = bgColor;
   roundRect(g.x, g.y, g.w, g.h, r);
   ctx.fill();
-  ctx.strokeStyle = border;
+  ctx.strokeStyle = borderColor;
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // gate label panel (left side)
-  const labelW = Math.min(46, g.w * 0.30);
+  // Parking position T-mark
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(g.x + g.w / 2, g.y);
+  ctx.lineTo(g.x + g.w / 2, g.y + g.h * 0.5);
+  ctx.moveTo(g.x + g.w * 0.3, g.y + g.h * 0.5);
+  ctx.lineTo(g.x + g.w * 0.7, g.y + g.h * 0.5);
+  ctx.stroke();
+
+  // Gate label
   ctx.fillStyle = '#143b5e';
-  roundRect(g.x + 5, g.y + 5, labelW, g.h - 10, 5);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 9px sans-serif';
+  ctx.font = 'bold 10px sans-serif';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('GATE', g.x + 5 + labelW / 2, g.y + g.h / 2 - 10);
-  ctx.font = 'bold 14px sans-serif';
-  ctx.fillText(g.label.replace('GATE ', ''), g.x + 5 + labelW / 2, g.y + g.h / 2 + 6);
+  ctx.textBaseline = 'top';
+  ctx.fillText(g.label, g.x + g.w / 2, g.y + g.h * 0.55);
 
-  // big number (the answer choice)
+  // Big answer number
   ctx.fillStyle = g.status === 'idle' ? '#143b5e' : '#fff';
-  const numFont = Math.floor(g.h * 0.55);
+  const numFont = Math.min(28, Math.floor(g.h * 0.40));
   ctx.font = 'bold ' + numFont + 'px sans-serif';
-  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(g.value, g.x + 5 + labelW + (g.w - labelW - 10) / 2, g.y + g.h / 2);
+  ctx.fillText(g.value, g.x + g.w / 2, g.y + g.h * 0.80);
+}
 
-  // jetbridge sticking out to the right (where plane parks)
-  const jbW = 18, jbH = 12;
-  const jbX = g.x + g.w;
-  const jbY = g.y + g.h / 2 - jbH / 2;
-  ctx.fillStyle = '#9aa0a6';
-  ctx.fillRect(jbX, jbY, jbW, jbH);
-  ctx.strokeStyle = '#555';
+function drawClouds(now) {
+  const cloudDefs = [
+    { baseX: 0.1, y: 0.12, s: 1.8, speed: 12 },
+    { baseX: 0.5, y: 0.28, s: 2.2, speed: 7 },
+    { baseX: 0.8, y: 0.08, s: 1.5, speed: 15 },
+    { baseX: 0.3, y: 0.60, s: 1.4, speed: 9 },
+    { baseX: 0.7, y: 0.75, s: 1.7, speed: 6 },
+  ];
+  cloudDefs.forEach((c) => {
+    const span = W + 250;
+    let x = ((c.baseX * W + now * c.speed * 10) % span);
+    if (x > W + 120) x -= span;
+    drawCloud(x, H * c.y, c.s);
+  });
+}
+
+function drawCloud(x, y, s) {
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(x, y, 22 * s, 0, Math.PI * 2);
+  ctx.arc(x + 22 * s, y + 5 * s, 16 * s, 0, Math.PI * 2);
+  ctx.arc(x - 20 * s, y + 5 * s, 16 * s, 0, Math.PI * 2);
+  ctx.arc(x + 8 * s, y - 10 * s, 14 * s, 0, Math.PI * 2);
+  ctx.arc(x - 8 * s, y - 8 * s, 12 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Top-down Boeing 737
+function drawPlaneTopDown(x, y, angle, scale) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath();
+  ctx.ellipse(3, 3, 30, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wings (swept back)
+  ctx.fillStyle = '#c4ccd4';
+  ctx.strokeStyle = '#666';
   ctx.lineWidth = 1;
-  ctx.strokeRect(jbX, jbY, jbW, jbH);
+  ctx.beginPath();
+  ctx.moveTo(-4, 0);
+  ctx.lineTo(-14, -38);
+  ctx.lineTo(-10, -40);
+  ctx.lineTo(6, -6);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-4, 0);
+  ctx.lineTo(-14, 38);
+  ctx.lineTo(-10, 40);
+  ctx.lineTo(6, 6);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Engines (under wings)
+  ctx.fillStyle = '#888';
+  ctx.beginPath();
+  ctx.ellipse(-6, -22, 6, 3, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(-6, 22, 6, 3, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // Horizontal stabilizers (tail)
+  ctx.fillStyle = '#ddd';
+  ctx.beginPath();
+  ctx.moveTo(-26, 0);
+  ctx.lineTo(-32, -14);
+  ctx.lineTo(-28, -14);
+  ctx.lineTo(-22, -2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-26, 0);
+  ctx.lineTo(-32, 14);
+  ctx.lineTo(-28, 14);
+  ctx.lineTo(-22, 2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Fuselage
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(32, 0);  // nose tip
+  ctx.bezierCurveTo(28, -5, 10, -6, -20, -5);
+  ctx.lineTo(-30, -3);
+  ctx.lineTo(-30, 3);
+  ctx.lineTo(-20, 5);
+  ctx.bezierCurveTo(10, 6, 28, 5, 32, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Blue stripe along fuselage
+  ctx.strokeStyle = '#0a7abf';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(28, 0);
+  ctx.lineTo(-26, 0);
+  ctx.stroke();
+
+  // Cockpit windows
+  ctx.fillStyle = '#2c4d66';
+  ctx.beginPath();
+  ctx.ellipse(26, -1.5, 3, 1.5, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(26, 1.5, 3, 1.5, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tail fin (vertical stabilizer - appears as small triangle on top-down)
+  ctx.fillStyle = '#ef476f';
+  ctx.beginPath();
+  ctx.moveTo(-26, 0);
+  ctx.lineTo(-34, -2);
+  ctx.lineTo(-34, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function roundRect(x, y, w, h, r) {
@@ -631,171 +719,6 @@ function drawTablePlacard() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, bx + bw / 2, by + bh / 2);
-}
-
-// Plane drawing (Boeing 737, side view, nose to the LEFT by default)
-function drawPlane(x, y, angle, scale) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.scale(scale, scale);
-
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#1a2a3a';
-  ctx.lineWidth = 1.5;
-
-  // --- swept main wing (behind fuselage) ---
-  ctx.fillStyle = '#c4ccd4';
-  ctx.beginPath();
-  ctx.moveTo(-4, 4);
-  ctx.lineTo(28, 22);
-  ctx.lineTo(46, 22);
-  ctx.lineTo(18, 3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // --- fuselage (long, slim 737 tube) ---
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  // pointed nose on the left, rounded tail on the right that sweeps up
-  ctx.moveTo(-68, 0);              // tip of radome
-  ctx.quadraticCurveTo(-58, -11, -40, -12); // upper nose curve
-  ctx.lineTo(40, -12);             // upper fuselage straight
-  ctx.quadraticCurveTo(58, -12, 64, -22);   // tail upsweep top
-  ctx.lineTo(70, -22);             // back of tail cone top
-  ctx.quadraticCurveTo(64, -8, 56, 8);      // tail cone underside
-  ctx.lineTo(-40, 12);             // lower fuselage straight
-  ctx.quadraticCurveTo(-58, 11, -68, 0);    // lower nose curve back to tip
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // --- blue cheatline along the fuselage ---
-  ctx.strokeStyle = '#0a7abf';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-58, -2);
-  ctx.lineTo(56, -2);
-  ctx.stroke();
-  // thinner secondary stripe
-  ctx.strokeStyle = '#143b5e';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(-58, 1.5);
-  ctx.lineTo(56, 1.5);
-  ctx.stroke();
-  ctx.strokeStyle = '#1a2a3a';
-  ctx.lineWidth = 1.5;
-
-  // --- cockpit windows (angular, 737 style) ---
-  ctx.fillStyle = '#2c4d66';
-  ctx.beginPath();
-  ctx.moveTo(-58, -4);
-  ctx.lineTo(-50, -9);
-  ctx.lineTo(-42, -9);
-  ctx.lineTo(-40, -5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // window frame separator
-  ctx.beginPath();
-  ctx.moveTo(-50, -9);
-  ctx.lineTo(-49, -5);
-  ctx.stroke();
-
-  // --- passenger windows (row of small squares) ---
-  ctx.fillStyle = '#2c4d66';
-  for (let i = -34; i < 42; i += 6) {
-    ctx.fillRect(i, -6, 3, 3);
-  }
-
-  // --- door outline ---
-  ctx.strokeStyle = '#1a2a3a';
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(-36, -10, 4, 9);
-  ctx.lineWidth = 1.5;
-
-  // --- vertical stabilizer (tall swept tail fin) ---
-  ctx.fillStyle = '#ef476f';
-  ctx.beginPath();
-  ctx.moveTo(34, -12);
-  ctx.lineTo(54, -38);
-  ctx.lineTo(64, -38);
-  ctx.lineTo(58, -12);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // fin marking line
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(48, -30);
-  ctx.lineTo(60, -22);
-  ctx.stroke();
-  ctx.strokeStyle = '#1a2a3a';
-
-  // --- horizontal stabilizer (small swept wing on tail) ---
-  ctx.fillStyle = '#dde2e7';
-  ctx.beginPath();
-  ctx.moveTo(54, -14);
-  ctx.lineTo(72, -18);
-  ctx.lineTo(74, -12);
-  ctx.lineTo(58, -10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // --- underwing engine (CFM56, slung low - 737 signature) ---
-  // pylon
-  ctx.fillStyle = '#bfc6cd';
-  ctx.fillRect(10, 8, 10, 8);
-  ctx.strokeRect(10, 8, 10, 8);
-  // nacelle (flat-bottom oval)
-  ctx.fillStyle = '#e8ecef';
-  ctx.beginPath();
-  ctx.moveTo(2, 16);
-  ctx.quadraticCurveTo(2, 26, 14, 27);
-  ctx.lineTo(24, 27);
-  ctx.quadraticCurveTo(34, 26, 32, 16);
-  ctx.lineTo(28, 14);
-  ctx.lineTo(6, 14);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // engine intake (dark front)
-  ctx.fillStyle = '#1a2a3a';
-  ctx.beginPath();
-  ctx.ellipse(4, 20, 2, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // engine fan hint
-  ctx.fillStyle = '#5a6066';
-  ctx.beginPath();
-  ctx.ellipse(4.5, 20, 1, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // exhaust at back of nacelle
-  ctx.fillStyle = '#444';
-  ctx.fillRect(30, 18, 3, 6);
-
-  // --- winglet (upswept tip) on far wing ---
-  ctx.fillStyle = '#c4ccd4';
-  ctx.beginPath();
-  ctx.moveTo(44, 22);
-  ctx.lineTo(48, 14);
-  ctx.lineTo(52, 15);
-  ctx.lineTo(48, 22);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // --- subtle "B737" tail-number text ---
-  ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 5px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('B737', 48, -6);
-
-  ctx.restore();
 }
 
 // === Main loop ===
