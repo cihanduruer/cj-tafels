@@ -159,7 +159,7 @@ function setPhase(phase) {
   if (phase === 'incoming') {
     state.phaseDuration = 8000; // total 8s: ~3s approach + 5s on strip
     // Random spawn point (different directions each time)
-    const runwayY = H * 0.28 + Math.max(32, H * 0.07) / 2;
+    const runwayY = H * 0.40 + Math.max(32, H * 0.07) / 2;
     const runwayRight = W * 0.9;
     const runwayLeft = W * 0.1;
     const spawns = [
@@ -208,7 +208,7 @@ function updatePlane(now) {
   const elapsed = now - state.phaseStart;
 
   // Runway Y center (must match drawRunway)
-  const runwayY = H * 0.28 + Math.max(32, H * 0.07) / 2;
+  const runwayY = H * 0.40 + Math.max(32, H * 0.07) / 2;
 
   if (state.phase === 'incoming') {
     // Continuous smooth flight along entire path (approach + on strip)
@@ -322,26 +322,9 @@ function updatePlane(now) {
 function draw() {
   const now = performance.now() / 1000;
 
-  // Dark slate apron background
-  ctx.fillStyle = '#4a5568';
+  // Green grass background
+  ctx.fillStyle = '#5da84a';
   ctx.fillRect(0, 0, W, H);
-
-  // Green grass strips (top and sides)
-  ctx.fillStyle = '#6abf45';
-  ctx.fillRect(0, 0, W, H * 0.08); // top grass
-  ctx.fillRect(0, 0, W * 0.04, H); // left grass
-  ctx.fillRect(W * 0.96, 0, W * 0.04, H); // right grass
-
-  // Apron grid lines (like the reference image)
-  ctx.strokeStyle = 'rgba(100,120,140,0.35)';
-  ctx.lineWidth = 1;
-  const gridSize = 50;
-  for (let x = 0; x < W; x += gridSize) {
-    ctx.beginPath(); ctx.moveTo(x, H * 0.08); ctx.lineTo(x, H); ctx.stroke();
-  }
-  for (let y = H * 0.08; y < H; y += gridSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
 
   // Road at the very top
   drawRoad();
@@ -352,7 +335,7 @@ function draw() {
   // Taxiway connecting runway to gates
   drawTaxiways();
 
-  // Runway (horizontal, upper-middle)
+  // Runway (horizontal, middle)
   drawRunway();
 
   // Gates (parking spots below runway)
@@ -397,7 +380,7 @@ function drawRoad() {
 }
 
 function drawRunway() {
-  const ry = H * 0.28;
+  const ry = H * 0.40;
   const rh = Math.max(32, H * 0.07);
   const rx = W * 0.1;
   const rw = W * 0.8;
@@ -440,7 +423,7 @@ function drawRunway() {
 
 function drawTaxiways() {
   if (!state.gates.length) return;
-  const ry = H * 0.28;
+  const ry = H * 0.40;
   const rh = Math.max(32, H * 0.07);
   const taxiW = 60;
   // Horizontal taxiway below runway with good gap
