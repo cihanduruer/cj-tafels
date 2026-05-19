@@ -438,10 +438,6 @@ function drawMiniPlane(color) {
   ctx.beginPath();
   ctx.ellipse(0, 2, 28, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Tail
-  ctx.beginPath();
-  ctx.ellipse(0, -16, 10, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawRoad(tod) {
