@@ -181,9 +181,9 @@ function setPhase(phase) {
       { x: W * 0.5, y: runwayY },                          // 4: mid-runway
       { x: runwayLeft, y: runwayY },                       // 5: end of runway
     ];
-    // Click becomes enabled at ~37% progress (when reaching threshold)
+    // Click becomes enabled at ~60% progress (when reaching threshold)
     state.clickEnableAt = 3 / 5; // segment 3 out of 5
-    state.plane.scale = 0.5;
+    state.plane.scale = 1;
   } else if (phase === 'landing') {
     state.phaseDuration = 2500;
   } else if (phase === 'flyaway') {
@@ -245,8 +245,8 @@ function updatePlane(now) {
     p.angle = lerpAngle(state.prevAngle, targetAngle, 0.12);
     state.prevAngle = p.angle;
 
-    // Scale: grow from small to full as we approach
-    p.scale = Math.min(1, 0.45 + 0.55 * Math.min(t / state.clickEnableAt, 1));
+    // Keep constant size throughout
+    p.scale = 1;
 
     if (t >= 1) {
       onTimeout();
@@ -322,17 +322,29 @@ function updatePlane(now) {
 function draw() {
   const now = performance.now() / 1000;
 
-  // Grass background
-  ctx.fillStyle = '#5da84a';
+  // Dark slate apron background
+  ctx.fillStyle = '#4a5568';
   ctx.fillRect(0, 0, W, H);
-  // Subtle grass texture lines
-  ctx.strokeStyle = 'rgba(80,140,60,0.3)';
+
+  // Green grass strips (top and sides)
+  ctx.fillStyle = '#6abf45';
+  ctx.fillRect(0, 0, W, H * 0.08); // top grass
+  ctx.fillRect(0, 0, W * 0.04, H); // left grass
+  ctx.fillRect(W * 0.96, 0, W * 0.04, H); // right grass
+
+  // Apron grid lines (like the reference image)
+  ctx.strokeStyle = 'rgba(100,120,140,0.35)';
   ctx.lineWidth = 1;
-  for (let i = 0; i < W; i += 28) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0); ctx.lineTo(i, H);
-    ctx.stroke();
+  const gridSize = 50;
+  for (let x = 0; x < W; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, H * 0.08); ctx.lineTo(x, H); ctx.stroke();
   }
+  for (let y = H * 0.08; y < H; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Road at the very top
+  drawRoad();
 
   // Terminal building (bottom)
   drawTerminal();
@@ -357,22 +369,43 @@ function draw() {
     drawPlaneTopDown(p.x, p.y, p.angle, p.scale);
   }
 
-  // Transparent drifting clouds (on top of everything)
-  drawClouds(now);
-
   // UI overlays
   if (state.clickEnabled) drawBanner();
   if (state.phase === 'incoming' && state.clickEnabled) drawCountdown();
   drawTablePlacard();
 }
 
+function drawRoad() {
+  // Horizontal road at the top with lane markings
+  const ry = H * 0.02;
+  const rh = H * 0.05;
+  ctx.fillStyle = '#3d3d3d';
+  ctx.fillRect(0, ry, W, rh);
+  // White dashed center line
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([16, 12]);
+  ctx.beginPath();
+  ctx.moveTo(0, ry + rh / 2);
+  ctx.lineTo(W, ry + rh / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Edge lines
+  ctx.fillStyle = '#eee';
+  ctx.fillRect(0, ry, W, 2);
+  ctx.fillRect(0, ry + rh - 2, W, 2);
+}
+
 function drawRunway() {
   const ry = H * 0.45;
-  const rh = Math.max(28, H * 0.06);
-  const rx = W * 0.2;
-  const rw = W * 0.6;
+  const rh = Math.max(32, H * 0.07);
+  const rx = W * 0.15;
+  const rw = W * 0.7;
+  // Green grass shoulders
+  ctx.fillStyle = '#6abf45';
+  ctx.fillRect(rx - 8, ry - 10, rw + 16, rh + 20);
   // Asphalt
-  ctx.fillStyle = '#3a3a3a';
+  ctx.fillStyle = '#2d2d2d';
   ctx.fillRect(rx, ry, rw, rh);
   // White edge lines
   ctx.fillStyle = '#fff';
@@ -381,7 +414,7 @@ function drawRunway() {
   // Dashed center line
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
-  ctx.setLineDash([20, 15]);
+  ctx.setLineDash([22, 16]);
   ctx.beginPath();
   ctx.moveTo(rx, ry + rh / 2);
   ctx.lineTo(rx + rw, ry + rh / 2);
@@ -389,20 +422,20 @@ function drawRunway() {
   ctx.setLineDash([]);
   // Threshold markings (left)
   ctx.fillStyle = '#fff';
-  for (let i = 0; i < 4; i++) {
-    ctx.fillRect(rx + 12, ry + 6 + i * (rh - 12) / 4, 30, 3);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(rx + 10, ry + 5 + i * (rh - 10) / 6, 35, 3);
   }
   // Threshold markings (right)
-  for (let i = 0; i < 4; i++) {
-    ctx.fillRect(rx + rw - 42, ry + 6 + i * (rh - 12) / 4, 30, 3);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(rx + rw - 45, ry + 5 + i * (rh - 10) / 6, 35, 3);
   }
   // Runway numbers
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 14px sans-serif';
+  ctx.font = 'bold 16px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('09', rx + 60, ry + rh / 2);
-  ctx.fillText('27', rx + rw - 60, ry + rh / 2);
+  ctx.fillText('09', rx + 65, ry + rh / 2);
+  ctx.fillText('27', rx + rw - 65, ry + rh / 2);
 }
 
 function drawTaxiways() {
@@ -452,64 +485,86 @@ function drawTaxiways() {
 }
 
 function drawTerminal() {
-  // Terminal building - fills from below gates to bottom of screen
-  const gateBottom = H * 0.72 + Math.min(160, H * 0.30); // bottom edge of gates
-  const th = H - gateBottom + 10; // extend past gate bottoms
-  const tw = W * 0.9;
+  // Terminal building - styled like reference: beige with blue glass roof
+  const gateBottom = H * 0.72 + Math.min(160, H * 0.30);
+  const th = H - gateBottom + 15;
+  const tw = W * 0.85;
   const tx = (W - tw) / 2;
   const ty = H - th;
-  // Main building
-  ctx.fillStyle = '#d0d4d8';
+
+  // Main building body (beige/tan)
+  ctx.fillStyle = '#d4c9a8';
   ctx.fillRect(tx, ty, tw, th);
-  ctx.strokeStyle = '#888';
+  ctx.strokeStyle = '#a89872';
   ctx.lineWidth = 2;
   ctx.strokeRect(tx, ty, tw, th);
-  // Roof edge
-  ctx.fillStyle = '#143b5e';
-  ctx.fillRect(tx, ty, tw, 5);
-  // Label
-  ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('\u2708 TERMINAL', tx + tw / 2, ty + th / 2 + 10);
-  // Control tower (circle, right side)
-  const ctX = tx + tw - 50;
-  const ctY = ty + 25;
-  ctx.fillStyle = '#8ac4e0';
+
+  // Blue glass roof sections (circular pattern like reference)
+  const centerX = tx + tw / 2;
+  const centerY = ty + th * 0.4;
+  ctx.fillStyle = '#5bb8d4';
   ctx.beginPath();
-  ctx.arc(ctX, ctY, 16, 0, Math.PI * 2);
+  ctx.arc(centerX, centerY, Math.min(th * 0.35, 30), 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#143b5e';
+  ctx.strokeStyle = '#3a98b4';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = '#ef476f'; // beacon
+  // Inner ring
+  ctx.fillStyle = '#7dcce4';
   ctx.beginPath();
-  ctx.arc(ctX, ctY, 5, 0, Math.PI * 2);
+  ctx.arc(centerX, centerY, Math.min(th * 0.2, 18), 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 9px sans-serif';
-  ctx.fillText('TWR', ctX, ctY + 24);
+  // Center dot (yellow beacon)
+  ctx.fillStyle = '#f0c040';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+  ctx.fill();
 
-  // Jet bridges from terminal roof to each gate
+  // Blue glass wings (left and right)
+  const wingW = tw * 0.28;
+  const wingH = th * 0.5;
+  // Left wing
+  ctx.fillStyle = '#4da8c4';
+  ctx.fillRect(tx + 8, ty + 6, wingW, wingH);
+  ctx.strokeStyle = '#3a98b4';
+  ctx.lineWidth = 1;
+  // Glass panel lines
+  for (let i = 0; i < 5; i++) {
+    const px = tx + 8 + (wingW / 5) * i;
+    ctx.beginPath(); ctx.moveTo(px, ty + 6); ctx.lineTo(px, ty + 6 + wingH); ctx.stroke();
+  }
+  // Right wing
+  ctx.fillStyle = '#4da8c4';
+  ctx.fillRect(tx + tw - wingW - 8, ty + 6, wingW, wingH);
+  for (let i = 0; i < 5; i++) {
+    const px = tx + tw - wingW - 8 + (wingW / 5) * i;
+    ctx.beginPath(); ctx.moveTo(px, ty + 6); ctx.lineTo(px, ty + 6 + wingH); ctx.stroke();
+  }
+
+  // TERMINAL label
+  ctx.fillStyle = '#4a3f2f';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('TERMINAL', centerX, ty + th * 0.8);
+
+  // Jet bridges from terminal to each gate
   state.gates.forEach((g) => {
     const bx = g.x + g.w / 2;
-    const bridgeTop = g.y + g.h; // bottom of gate
-    const bridgeBot = ty; // top of terminal
-    // Bridge corridor
-    ctx.fillStyle = '#9ca3ab';
-    ctx.fillRect(bx - 5, bridgeTop, 10, bridgeBot - bridgeTop);
-    ctx.strokeStyle = '#666';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx - 5, bridgeTop, 10, bridgeBot - bridgeTop);
-    // Connector circles at ends
-    ctx.fillStyle = '#777';
-    ctx.beginPath();
-    ctx.arc(bx, bridgeTop, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(bx, bridgeBot, 6, 0, Math.PI * 2);
-    ctx.fill();
+    const bridgeTop = g.y + g.h;
+    const bridgeBot = ty;
+    // Bridge corridor (wider, with articulation)
+    ctx.fillStyle = '#b8b0a0';
+    ctx.fillRect(bx - 7, bridgeTop, 14, bridgeBot - bridgeTop);
+    ctx.strokeStyle = '#8a8070';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(bx - 7, bridgeTop, 14, bridgeBot - bridgeTop);
+    // Connector nozzle at gate end
+    ctx.fillStyle = '#ef476f';
+    ctx.fillRect(bx - 10, bridgeTop - 4, 20, 8);
+    // Connector at terminal end
+    ctx.fillStyle = '#8a8070';
+    ctx.fillRect(bx - 10, bridgeBot - 4, 20, 8);
   });
 }
 
