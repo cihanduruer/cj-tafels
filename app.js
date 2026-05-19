@@ -294,6 +294,7 @@ function updatePlane(now) {
     p.scale = 1 - 0.35 * easeInOutCubic(t);
     if (t >= 1) {
       p.visible = false;
+      state.phase = 'idle'; // prevent re-scheduling on subsequent frames
       setTimeout(nextQuestion, 200);
     }
   } else if (state.phase === 'parked') {
