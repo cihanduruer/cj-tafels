@@ -185,7 +185,7 @@ function setPhase(phase) {
     state.clickEnableAt = 3 / 5; // segment 3 out of 5
     state.plane.scale = 1;
   } else if (phase === 'landing') {
-    state.phaseDuration = 2500;
+    state.phaseDuration = 4000; // longer to follow full taxi path
   } else if (phase === 'flyaway') {
     state.phaseDuration = 2000;
   }
@@ -252,41 +252,28 @@ function updatePlane(now) {
       onTimeout();
     }
   } else if (state.phase === 'landing') {
-    // Smooth taxi from current position down to the correct gate
+    // Follow taxi path: runway → connector → taxiway → spur → gate
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const target = state.landTarget;
-    const sx = state.landFrom.x, sy = state.landFrom.y;
-    const tx = target.x + target.w / 2;
-    const ty = target.y - 12;
-    // Three-phase: decelerate on strip, turn toward gate, approach gate
-    const p1 = 0.3, p2 = 0.65;
-    if (t < p1) {
-      // Decelerate along runway
-      const lt = t / p1;
-      const e = easeOutCubic(lt);
-      p.x = sx + (tx - sx) * 0.5 * e;
-      p.y = sy;
-      p.angle = Math.PI;
-    } else if (t < p2) {
-      // Turn toward gate
-      const lt = (t - p1) / (p2 - p1);
-      const e = easeInOutCubic(lt);
-      const midX = sx + (tx - sx) * 0.5;
-      p.x = midX + (tx - midX) * e;
-      p.y = sy + (ty - sy) * e * 0.5;
-      p.angle = lerpAngle(Math.PI, Math.PI / 2, easeOutCubic(lt));
-    } else {
-      // Final approach to gate
-      const lt = (t - p2) / (1 - p2);
-      const e = easeOutCubic(lt);
-      p.x = tx;
-      const midY = sy + (ty - sy) * 0.5;
-      p.y = midY + (ty - midY) * e;
-      p.angle = Math.PI / 2;
-    }
-    p.scale = 1 - 0.35 * easeInOutCubic(t);
+    const path = state.landPath;
+    const n = path.length - 1;
+    const rawPos = t * n;
+    const segment = Math.min(Math.floor(rawPos), n - 1);
+    const lt = rawPos - segment;
+    const e = easeInOut(lt);
+    const from = path[segment];
+    const to = path[segment + 1];
+    p.x = from.x + (to.x - from.x) * e;
+    p.y = from.y + (to.y - from.y) * e;
+    // Point nose in direction of travel
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    p.angle = Math.atan2(dy, dx);
+    p.scale = 1 - 0.3 * easeInOutCubic(t);
     if (t >= 1) {
-      state.parkedAt.push({ x: tx, y: ty, scale: 0.6, angle: Math.PI / 2 });
+      const tx = target.x + target.w / 2;
+      const ty = target.y - 12;
+      state.parkedAt.push({ x: tx, y: ty, scale: 0.65, angle: Math.PI / 2 });
       state.phase = 'idle';
       p.visible = false;
       state.prevAngle = null;
@@ -426,9 +413,24 @@ function drawTaxiways() {
   const ry = H * 0.40;
   const rh = Math.max(32, H * 0.07);
   const taxiW = 60;
-  // Horizontal taxiway below runway with good gap
+  // Horizontal taxiway below runway
   const taxiY = ry + rh + 40;
   const taxiH = 60;
+
+  // Connector from runway to taxiway (at center)
+  const connX = W * 0.5;
+  ctx.fillStyle = '#3d3d3d';
+  ctx.fillRect(connX - taxiW / 2, ry + rh, taxiW, taxiY - (ry + rh));
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.moveTo(connX, ry + rh);
+  ctx.lineTo(connX, taxiY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Main horizontal taxiway
   ctx.fillStyle = '#3d3d3d';
   ctx.fillRect(W * 0.06, taxiY, W * 0.88, taxiH);
   // White edge lines
@@ -937,6 +939,27 @@ function onTimeout() {
 function startLanding(gate) {
   state.landTarget = gate;
   state.landFrom = { x: state.plane.x, y: state.plane.y };
+
+  // Build taxi path: current pos → connector point → taxiway level → gate spur → gate
+  const ry = H * 0.40;
+  const rh = Math.max(32, H * 0.07);
+  const taxiY = ry + rh + 40;
+  const taxiH = 60;
+  const connX = W * 0.5; // connector center
+  const taxiCenterY = taxiY + taxiH / 2;
+  const gateX = gate.x + gate.w / 2;
+  const gateY = gate.y - 12;
+  const sx = state.plane.x;
+  const sy = state.plane.y;
+
+  state.landPath = [
+    { x: sx, y: sy },                    // current position on runway
+    { x: connX, y: sy },                 // taxi along runway to connector
+    { x: connX, y: taxiCenterY },        // down connector to taxiway
+    { x: gateX, y: taxiCenterY },        // along taxiway to gate spur
+    { x: gateX, y: gateY },             // down spur to gate
+  ];
+
   setPhase('landing');
 }
 
