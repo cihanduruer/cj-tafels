@@ -421,3 +421,67 @@ a.game-tile .game-tile-play {
   .welcome .home-grid { gap: 18px; padding: 0 4px; }
   a.game-tile { min-height: 190px; padding: 26px 16px; }
 }
+
+/* === Result screen (full-width tabular) === */
+.result-card {
+  border-radius: 12px;
+  max-width: 100%;
+  width: 100%;
+  padding: 20px 16px;
+  text-align: center;
+}
+.result-card h2 { margin: 0 0 6px; font-size: 1.4rem; }
+.result-card .stars { font-size: 1.6rem; margin-bottom: 12px; }
+
+.result-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px 12px;
+  margin-bottom: 16px;
+  background: #f0f4f8;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.rs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+.rs-label { font-size: 0.85rem; color: #555; }
+.rs-value { font-weight: 700; font-size: 0.95rem; color: #143b5e; }
+
+.result-table {
+  width: 100%;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+.result-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.result-table th {
+  background: #143b5e;
+  color: #fff;
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+}
+.result-table th:first-child { border-radius: 8px 0 0 0; }
+.result-table th:last-child { border-radius: 0 8px 0 0; }
+.result-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #e8ecf0;
+}
+.result-table tr.rt-good { background: #e6fff5; }
+.result-table tr.rt-bad { background: #fff0f0; }
+.result-table tr:last-child td:first-child { border-radius: 0 0 0 8px; }
+.result-table tr:last-child td:last-child { border-radius: 0 0 8px 0; }
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}

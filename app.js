@@ -102,6 +102,7 @@ function startGame(table) {
   state.mistakes = [];
   state.parkedAt = [];
   state.fastCount = 0;
+  state.questionResults = [];
   $('menu').classList.add('hidden');
   $('result').classList.add('hidden');
   $('game').classList.remove('hidden');
@@ -383,10 +384,64 @@ function draw() {
     drawRunwayLights();
   }
 
+  // Progress planes (bottom-left)
+  drawProgressPlanes();
+
   // UI overlays
   if (state.clickEnabled) drawBanner();
   if (state.phase === 'incoming' && state.clickEnabled) drawCountdown();
   drawTablePlacard();
+}
+
+function drawProgressPlanes() {
+  const total = TOTAL_QUESTIONS;
+  const size = 16;
+  const gap = 6;
+  const startX = 14;
+  const startY = H - 24;
+  for (let i = 0; i < total; i++) {
+    const px = startX + i * (size + gap);
+    const py = startY;
+    ctx.save();
+    ctx.translate(px + size / 2, py);
+    ctx.scale(0.35, 0.35);
+    if (i < state.questionNum - 1) {
+      // Completed question
+      if (state.questionResults && state.questionResults[i] && state.questionResults[i].result === 'correct') {
+        ctx.globalAlpha = 1;
+        drawMiniPlane('#06d6a0'); // green
+      } else {
+        ctx.globalAlpha = 0.8;
+        drawMiniPlane('#ef476f'); // red
+      }
+    } else if (i === state.questionNum - 1) {
+      // Current question
+      ctx.globalAlpha = 1;
+      drawMiniPlane('#ffd166'); // yellow - active
+    } else {
+      // Future question
+      ctx.globalAlpha = 0.3;
+      drawMiniPlane('#fff');
+    }
+    ctx.restore();
+  }
+}
+
+function drawMiniPlane(color) {
+  // Tiny top-down plane silhouette
+  ctx.fillStyle = color;
+  // Fuselage
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 8, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Wings
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 28, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Tail
+  ctx.beginPath();
+  ctx.ellipse(0, -16, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawRoad(tod) {
@@ -977,6 +1032,7 @@ function onGateChosen(gate) {
     }
     fb.className = 'feedback good' + (fast ? ' fast' : '');
     $('score').textContent = state.score;
+    state.questionResults.push({ a, b, correct, answer: gate.value, result: 'correct' });
     startLanding(gate);
   } else {
     gate.status = 'wrong';
@@ -986,6 +1042,7 @@ function onGateChosen(gate) {
     fb.textContent = `❌ Oeps! ${a} × ${b} = ${correct}. Het vliegtuig vliegt weg!`;
     fb.className = 'feedback bad';
     state.mistakes.push({ a, b, correct, answer: gate.value });
+    state.questionResults.push({ a, b, correct, answer: gate.value, result: 'wrong' });
     state.flyFrom = { x: state.plane.x, y: state.plane.y };
     state.flyFromAngle = state.plane.angle;
     setPhase('flyaway');
@@ -1004,6 +1061,7 @@ function onTimeout() {
   fb.textContent = `⏰ Te laat! ${a} × ${b} = ${correct}`;
   fb.className = 'feedback bad';
   state.mistakes.push({ a, b, correct, answer: null });
+  state.questionResults.push({ a, b, correct, answer: null, result: 'wrong' });
   state.flyFrom = { x: state.plane.x, y: state.plane.y };
   state.flyFromAngle = state.plane.angle;
   setPhase('flyaway');
@@ -1044,7 +1102,6 @@ function showResult() {
   const score = state.score;
   const total = TOTAL_QUESTIONS;
   const title = $('resultTitle');
-  const text = $('resultText');
   const stars = $('stars');
 
   let starCount = 1;
@@ -1064,15 +1121,26 @@ function showResult() {
   if (isNewHigh) setHighScore(state.table, score);
   const newHigh = isNewHigh ? score : prevHigh;
 
-  const tableLabel = state.table === null ? 'mix' : `tafel van ${state.table}`;
-  let msg = `Je had ${score} van de ${total} goed (${tableLabel}).`;
-  if (state.fastCount) msg += ` 🚀 ${state.fastCount}× supersnel!`;
-  if (isNewHigh) msg += ` 🎉 Nieuw record: ${score}!`;
-  else msg += ` Hoogste score: ${newHigh}.`;
-  if (state.mistakes.length > 0) {
-    msg += ' Foutjes: ' + state.mistakes.map((m) => `${m.a}×${m.b}=${m.correct}`).join(', ');
+  // Summary bar
+  const tableLabel = state.table === null ? 'Mix 🎲' : `Tafel van ${state.table}`;
+  let summaryHtml = `<div class="rs-row"><span class="rs-label">Tafel</span><span class="rs-value">${tableLabel}</span></div>`;
+  summaryHtml += `<div class="rs-row"><span class="rs-label">Score</span><span class="rs-value">${score} / ${total}</span></div>`;
+  if (state.fastCount) summaryHtml += `<div class="rs-row"><span class="rs-label">Supersnel</span><span class="rs-value">🚀 ${state.fastCount}×</span></div>`;
+  summaryHtml += `<div class="rs-row"><span class="rs-label">Record</span><span class="rs-value">${isNewHigh ? '🎉 NIEUW! ' : ''}${newHigh}</span></div>`;
+  $('resultSummary').innerHTML = summaryHtml;
+
+  // Detailed table of all questions
+  let tableHtml = '<table><thead><tr><th>#</th><th>Vraag</th><th>Jouw antwoord</th><th>Goed?</th></tr></thead><tbody>';
+  for (let i = 0; i < state.questionResults.length; i++) {
+    const q = state.questionResults[i];
+    const icon = q.result === 'correct' ? '✅' : '❌';
+    const rowClass = q.result === 'correct' ? 'rt-good' : 'rt-bad';
+    const answerText = q.answer !== null ? q.answer : '⏰';
+    const correctText = q.result === 'wrong' ? ` (=${q.correct})` : '';
+    tableHtml += `<tr class="${rowClass}"><td>${i + 1}</td><td>${q.a} × ${q.b}</td><td>${answerText}${correctText}</td><td>${icon}</td></tr>`;
   }
-  text.textContent = msg;
+  tableHtml += '</tbody></table>';
+  $('resultTable').innerHTML = tableHtml;
 }
 
 // === Utils ===
