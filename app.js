@@ -361,7 +361,7 @@ function draw() {
   drawClouds(now);
 
   // UI overlays
-  drawBanner();
+  if (state.clickEnabled) drawBanner();
   if (state.phase === 'incoming' && state.clickEnabled) drawCountdown();
   drawTablePlacard();
 }
