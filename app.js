@@ -551,22 +551,31 @@ function drawBanner() {
 function drawCountdown() {
   const elapsed = performance.now() - state.phaseStart;
   const remain = Math.max(0, 1 - elapsed / HOVER_TIMEOUT_MS);
-  const barMaxW = Math.min(280, W * 0.5);
-  const barH = 10;
-  const bx = (W - barMaxW) / 2;
-  const by = 56; // just below the question banner
+  const barMaxW = 160;
+  const barH = 12;
+  // Position above the hovering plane
+  const p = state.plane;
+  const bx = Math.round(p.x - barMaxW / 2);
+  const by = Math.round(p.y - 60);
   // track
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  roundRect(bx, by, barMaxW, barH, 5); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  roundRect(bx, by, barMaxW, barH, 6); ctx.fill();
   // fill (green -> orange -> red)
   let color = '#06d6a0';
   if (remain < 0.5) color = '#ffd166';
   if (remain < 0.25) color = '#ef476f';
   ctx.fillStyle = color;
-  roundRect(bx, by, barMaxW * remain, barH, 5); ctx.fill();
+  roundRect(bx, by, barMaxW * remain, barH, 6); ctx.fill();
   ctx.strokeStyle = '#143b5e';
   ctx.lineWidth = 1.5;
-  roundRect(bx, by, barMaxW, barH, 5); ctx.stroke();
+  roundRect(bx, by, barMaxW, barH, 6); ctx.stroke();
+  // seconds label
+  const secs = Math.max(0, HOVER_TIMEOUT_MS - elapsed) / 1000;
+  ctx.fillStyle = '#143b5e';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(secs.toFixed(1) + 's', p.x, by - 3);
 }
 
 function drawTablePlacard() {
