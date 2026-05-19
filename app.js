@@ -499,7 +499,7 @@ function drawGate(g) {
 
   // Big answer number
   ctx.fillStyle = g.status === 'idle' ? '#143b5e' : '#fff';
-  const numFont = Math.min(28, Math.floor(g.h * 0.40));
+  const numFont = Math.min(56, Math.floor(g.h * 0.55));
   ctx.font = 'bold ' + numFont + 'px sans-serif';
   ctx.textBaseline = 'middle';
   ctx.fillText(g.value, g.x + g.w / 2, g.y + g.h * 0.80);
