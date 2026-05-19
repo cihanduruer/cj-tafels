@@ -313,7 +313,6 @@ function updatePlane(now) {
       state.prevAngle = null;
       setTimeout(nextQuestion, 300);
     }
-    }
   } else if (state.phase === 'parked') {
     // stay
   }
@@ -938,4 +937,5 @@ function shuffle(arr) {
 }
 
 showMenu();
+
 
