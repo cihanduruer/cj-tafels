@@ -180,16 +180,25 @@ function setPhase(phase) {
     state.phaseDuration = Infinity;
     state.clickEnabled = true;
   } else if (phase === 'landing') {
-    state.phaseDuration = 1600;
+    state.phaseDuration = 2400;
   } else if (phase === 'looping') {
     state.phaseDuration = 2200;
   } else if (phase === 'flyaway') {
-    state.phaseDuration = 1400;
+    state.phaseDuration = 1800;
   }
 }
 
 function easeOut(t) { return 1 - Math.pow(1 - t, 2); }
 function easeInOut(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; }
+function easeInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+function easeInCubic(t) { return t * t * t; }
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+function lerpAngle(a, b, t) {
+  let d = b - a;
+  while (d >  Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
 
 function updatePlane(now) {
   const p = state.plane;
@@ -219,25 +228,31 @@ function updatePlane(now) {
     }
   } else if (state.phase === 'landing') {
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInOut(t);
+    const e = easeInOutCubic(t);
     const target = state.landTarget;
     const sx = state.landFrom.x, sy = state.landFrom.y;
     const tx = target.x + target.w + 38; // park to the right of the gate, nose touching jetbridge
     const ty = target.y + target.h / 2;
-    // Cubic bezier: descend, then approach horizontally from the right
-    const c1x = sx - Math.abs(sx - tx) * 0.15;
-    const c1y = sy + (ty - sy) * 0.6;
-    const c2x = tx + Math.abs(sx - tx) * 0.30;
-    const c2y = ty; // ensures horizontal arrival tangent
+    // Cubic bezier: descend, then approach horizontally from the right.
+    // Both control points placed so the final tangent is purely horizontal
+    // (c2 shares y with target) for a smooth "flare" onto the gate.
+    const dx = sx - tx;
+    const c1x = sx - dx * 0.10;
+    const c1y = sy + (ty - sy) * 0.55;
+    const c2x = tx + dx * 0.45;
+    const c2y = ty;
     const mt = 1 - e;
     const x = mt*mt*mt*sx + 3*mt*mt*e*c1x + 3*mt*e*e*c2x + e*e*e*tx;
     const y = mt*mt*mt*sy + 3*mt*mt*e*c1y + 3*mt*e*e*c2y + e*e*e*ty;
-    const dx = 3*mt*mt*(c1x - sx) + 6*mt*e*(c2x - c1x) + 3*e*e*(tx - c2x);
-    const dy = 3*mt*mt*(c1y - sy) + 6*mt*e*(c2y - c1y) + 3*e*e*(ty - c2y);
+    const tdx = 3*mt*mt*(c1x - sx) + 6*mt*e*(c2x - c1x) + 3*e*e*(tx - c2x);
+    const tdy = 3*mt*mt*(c1y - sy) + 6*mt*e*(c2y - c1y) + 3*e*e*(ty - c2y);
     p.x = x;
     p.y = y;
-    p.angle = Math.atan2(dy, dx) + Math.PI; // nose faces left by default
-    p.scale = 1 - 0.5 * e;
+    const targetAngle = Math.atan2(tdy, tdx) + Math.PI; // nose faces left by default
+    // Smoothly settle to angle 0 (level) at the end so parking is calm.
+    const settle = Math.max(0, (e - 0.75) / 0.25); // 0..1 in last 25%
+    p.angle = lerpAngle(targetAngle, 0, easeOutCubic(settle));
+    p.scale = 1 - 0.5 * easeInOutCubic(t);
     if (t >= 1) {
       state.parkedAt.push({ x: tx, y: ty, scale: 0.5, angle: 0 });
       setPhase('parked');
@@ -261,16 +276,22 @@ function updatePlane(now) {
     }
   } else if (state.phase === 'flyaway') {
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInOut(t);
+    const e = easeInCubic(t); // accelerate away
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    // klimt op en vliegt naar links uit beeld
-    const tx = -120;
-    const ty = -60;
-    p.x = sx + (tx - sx) * e;
-    p.y = sy + (ty - sy) * e;
-    // neus omhoog (links-omhoog)
-    p.angle = -0.4 * e;
-    p.scale = 1 - 0.3 * e;
+    // Climb and exit toward the upper-left, curved path
+    const tx = -140;
+    const ty = -80;
+    // Quadratic bezier with control point pulling up first, then left
+    const cx = sx - Math.abs(sx - tx) * 0.25;
+    const cy = Math.min(sy, ty) - 80;
+    const mt = 1 - e;
+    p.x = mt*mt*sx + 2*mt*e*cx + e*e*tx;
+    p.y = mt*mt*sy + 2*mt*e*cy + e*e*ty;
+    // Tangent for natural rotation (nose up, then climbing left)
+    const tdx = 2*mt*(cx - sx) + 2*e*(tx - cx);
+    const tdy = 2*mt*(cy - sy) + 2*e*(ty - cy);
+    p.angle = Math.atan2(tdy, tdx) + Math.PI;
+    p.scale = 1 - 0.35 * easeInOutCubic(t);
     if (t >= 1) {
       p.visible = false;
       setTimeout(nextQuestion, 200);
