@@ -548,21 +548,22 @@ function drawBanner() {
   const { a, b } = state.current;
   if (!a) return;
   const text = `${a} × ${b} = ?`;
-  ctx.font = 'bold 28px sans-serif';
+  const fontSize = Math.min(84, Math.max(40, W * 0.10));
+  ctx.font = `bold ${fontSize}px sans-serif`;
   const tw = ctx.measureText(text).width;
-  const padX = 18, padY = 10;
+  const padX = fontSize * 0.6, padY = fontSize * 0.35;
   const bw = tw + padX * 2;
-  const bh = 28 + padY * 2;
+  const bh = fontSize + padY * 2;
   const bx = (W - bw) / 2;
   const by = 12;
   // shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.15)';
-  roundRect(bx + 3, by + 4, bw, bh, 12); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  roundRect(bx + 4, by + 5, bw, bh, 16); ctx.fill();
   // banner
   ctx.fillStyle = '#fff3b0';
-  roundRect(bx, by, bw, bh, 12); ctx.fill();
+  roundRect(bx, by, bw, bh, 16); ctx.fill();
   ctx.strokeStyle = '#143b5e';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = '#143b5e';
   ctx.textAlign = 'center';
@@ -573,31 +574,35 @@ function drawBanner() {
 function drawCountdown() {
   const elapsed = performance.now() - state.phaseStart;
   const remain = Math.max(0, 1 - elapsed / HOVER_TIMEOUT_MS);
-  const barMaxW = 160;
-  const barH = 12;
-  // Position above the hovering plane
+  const barMaxW = 140;
+  const barH = 10;
   const p = state.plane;
+  // Place the bar just above the plane's top edge (plane ~38px tall at scale 1)
+  const planeTop = p.y - 40;
+  const by = Math.round(planeTop - barH - 14); // leaves room for the seconds label
   const bx = Math.round(p.x - barMaxW / 2);
-  const by = Math.round(p.y - 60);
+  // seconds label just above the bar
+  const secs = Math.max(0, HOVER_TIMEOUT_MS - elapsed) / 1000;
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  // text shadow for readability
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(secs.toFixed(1) + 's', p.x + 1, by - 1);
+  ctx.fillStyle = '#143b5e';
+  ctx.fillText(secs.toFixed(1) + 's', p.x, by - 2);
   // track
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  roundRect(bx, by, barMaxW, barH, 6); ctx.fill();
+  roundRect(bx, by, barMaxW, barH, 5); ctx.fill();
   // fill (green -> orange -> red)
   let color = '#06d6a0';
   if (remain < 0.5) color = '#ffd166';
   if (remain < 0.25) color = '#ef476f';
   ctx.fillStyle = color;
-  roundRect(bx, by, barMaxW * remain, barH, 6); ctx.fill();
+  roundRect(bx, by, barMaxW * remain, barH, 5); ctx.fill();
   ctx.strokeStyle = '#143b5e';
   ctx.lineWidth = 1.5;
-  roundRect(bx, by, barMaxW, barH, 6); ctx.stroke();
-  // seconds label
-  const secs = Math.max(0, HOVER_TIMEOUT_MS - elapsed) / 1000;
-  ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(secs.toFixed(1) + 's', p.x, by - 3);
+  roundRect(bx, by, barMaxW, barH, 5); ctx.stroke();
 }
 
 function drawTablePlacard() {
