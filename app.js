@@ -86,22 +86,6 @@ $('backBtn').addEventListener('click', showMenu);
 $('menuBtn').addEventListener('click', showMenu);
 $('againBtn').addEventListener('click', () => startGame(state.table));
 
-// Fullscreen button
-const fsBtn = $('fullscreenBtn');
-if (fsBtn) {
-  fsBtn.addEventListener('click', toggleFullscreen);
-}
-function toggleFullscreen() {
-  const el = document.documentElement;
-  if (!document.fullscreenElement) {
-    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-  } else {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-  }
-}
-
 function showMenu() {
   $('menu').classList.remove('hidden');
   $('game').classList.add('hidden');
@@ -211,7 +195,7 @@ function updatePlane(now) {
     const e = easeInOut(t);
     const startX = W + 60;
     const startY = H * 0.15;
-    const endX = W * 0.82;  // right end of runway
+    const endX = W * 0.75;  // right end of runway
     const endY = runwayY;
     p.x = startX + (endX - startX) * e;
     p.y = startY + (endY - startY) * e;
@@ -224,8 +208,8 @@ function updatePlane(now) {
     // Fly along runway from right to left over 3 seconds (aligned horizontal)
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInOutCubic(t);
-    const startX = W * 0.82;
-    const endX = W * 0.18;
+    const startX = W * 0.75;
+    const endX = W * 0.25;
     p.x = startX + (endX - startX) * e;
     p.y = runwayY;
     p.angle = Math.PI; // nose pointing left
@@ -351,8 +335,8 @@ function draw() {
 function drawRunway() {
   const ry = H * 0.45;
   const rh = Math.max(28, H * 0.06);
-  const rx = W * 0.08;
-  const rw = W * 0.84;
+  const rx = W * 0.2;
+  const rw = W * 0.6;
   // Asphalt
   ctx.fillStyle = '#3a3a3a';
   ctx.fillRect(rx, ry, rw, rh);
