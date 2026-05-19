@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CJ Spelletjes" />
+  <meta name="theme-color" content="#87ceeb" />
+  <title>CJ Spelletjes 🎮</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="welcome-body">
+  <div class="sky">
+    <div class="cloud cloud1">☁️</div>
+    <div class="cloud cloud2">☁️</div>
+    <div class="cloud cloud3">☁️</div>
+    <div class="cloud cloud4">☁️</div>
+  </div>
+
+  <button id="fullscreenBtn" class="fs-btn" title="Volledig scherm">⛶</button>
+
+  <main class="welcome">
+    <div class="welcome-hero">
+      <div class="welcome-logo">🎮</div>
+      <h1 class="welcome-title">CJ Spelletjes</h1>
+      <p class="welcome-subtitle">Welkom! Kies hieronder een spel om te beginnen.</p>
+    </div>
+
+    <div class="home-grid">
+      <a class="game-tile" href="tafels.html">
+        <div class="game-tile-emoji">✈️</div>
+        <div class="game-tile-title">Tafels Vliegveld</div>
+        <div class="game-tile-desc">Oefen de tafels van 1 t/m 10 met landende vliegtuigen</div>
+        <div class="game-tile-play">Spelen ▶</div>
+      </a>
+      <div class="game-tile coming-soon">
+        <div class="game-tile-emoji">🚧</div>
+        <div class="game-tile-title">Binnenkort</div>
+        <div class="game-tile-desc">Meer spelletjes onderweg!</div>
+      </div>
+    </div>
+
+    <footer class="welcome-footer">Tip: tik op ⛶ rechtsboven voor volledig scherm</footer>
+  </main>
+
+  <script>
+    // Alleen fullscreen-knop op de welkomstpagina
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+      const el = document.documentElement;
+      if (!document.fullscreenElement) {
+        (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      } else {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      }
+    });
+  </script>
+</body>
+</html>
+
