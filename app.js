@@ -503,17 +503,44 @@ function drawTerminal() {
 
 function drawGate(g) {
   const r = 8;
+  // Press flash feedback
+  let pressScale = 1;
+  let glowAlpha = 0;
+  if (g.pressTime) {
+    const elapsed = performance.now() - g.pressTime;
+    if (elapsed < 300) {
+      pressScale = 1 - 0.05 * Math.sin(Math.PI * elapsed / 300);
+      glowAlpha = 0.4 * (1 - elapsed / 300);
+    }
+  }
+
+  ctx.save();
+  // Scale from center for press effect
+  const cx = g.x + g.w / 2;
+  const cy = g.y + g.h / 2;
+  ctx.translate(cx, cy);
+  ctx.scale(pressScale, pressScale);
+  ctx.translate(-cx, -cy);
+
   // Gate apron pad
   let bgColor = '#b8bcc0';
   let borderColor = '#555';
-  if (g.status === 'correct') { bgColor = '#5be0b3'; borderColor = '#04835f'; }
-  else if (g.status === 'wrong') { bgColor = '#ff7a92'; borderColor = '#a52a47'; }
+  let borderWidth = 3;
+  if (g.status === 'correct') { bgColor = '#5be0b3'; borderColor = '#04835f'; borderWidth = 5; }
+  else if (g.status === 'wrong') { bgColor = '#ff7a92'; borderColor = '#a52a47'; borderWidth = 5; }
+
+  // Glow effect on press
+  if (glowAlpha > 0) {
+    ctx.shadowColor = g.status === 'correct' ? '#06d6a0' : g.status === 'wrong' ? '#ef476f' : '#4dabf7';
+    ctx.shadowBlur = 20;
+  }
 
   ctx.fillStyle = bgColor;
   roundRect(g.x, g.y, g.w, g.h, r);
   ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = borderWidth;
   ctx.stroke();
 
   // Parking position T-mark
@@ -528,7 +555,7 @@ function drawGate(g) {
 
   // Gate label
   ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 10px sans-serif';
+  ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(g.label, g.x + g.w / 2, g.y + g.h * 0.55);
@@ -539,6 +566,8 @@ function drawGate(g) {
   ctx.font = 'bold ' + numFont + 'px sans-serif';
   ctx.textBaseline = 'middle';
   ctx.fillText(g.value, g.x + g.w / 2, g.y + g.h * 0.80);
+
+  ctx.restore();
 }
 
 function drawClouds(now) {
@@ -778,18 +807,21 @@ requestAnimationFrame(loop);
 
 // === Input ===
 function handleCanvasClick(evt) {
+  evt.preventDefault();
   if (!state.clickEnabled) return;
   const rect = canvas.getBoundingClientRect();
   const cx = (evt.clientX ?? evt.touches?.[0]?.clientX) - rect.left;
   const cy = (evt.clientY ?? evt.touches?.[0]?.clientY) - rect.top;
   for (const g of state.gates) {
     if (cx >= g.x && cx <= g.x + g.w && cy >= g.y && cy <= g.y + g.h) {
+      g.pressTime = performance.now(); // trigger press flash
       onGateChosen(g);
       break;
     }
   }
 }
 canvas.addEventListener('click', handleCanvasClick);
+canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
 
 function onGateChosen(gate) {
   state.clickEnabled = false;
@@ -826,9 +858,12 @@ function onTimeout() {
   state.clickEnabled = false;
   const { correct, a, b } = state.current;
   const fb = $('feedback');
+  // Mark all gates red (missed)
+  state.gates.forEach((g) => { g.status = 'wrong'; });
+  // Highlight the correct one
   const correctGate = state.gates.find((g) => g.value === correct);
   if (correctGate) correctGate.status = 'correct';
-  fb.textContent = `⏰ Te laat! ${a} × ${b} = ${correct}. Het vliegtuig vliegt door!`;
+  fb.textContent = `⏰ Te laat! ${a} × ${b} = ${correct}`;
   fb.className = 'feedback bad';
   state.mistakes.push({ a, b, correct, answer: null });
   state.flyFrom = { x: state.plane.x, y: state.plane.y };
