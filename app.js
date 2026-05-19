@@ -426,9 +426,10 @@ function drawTaxiways() {
 }
 
 function drawTerminal() {
-  // Terminal building at the very bottom
-  const th = Math.min(60, H * 0.10);
-  const tw = W * 0.8;
+  // Terminal building - fills from below gates to bottom of screen
+  const gateBottom = H * 0.72 + Math.min(160, H * 0.30); // bottom edge of gates
+  const th = H - gateBottom + 10; // extend past gate bottoms
+  const tw = W * 0.9;
   const tx = (W - tw) / 2;
   const ty = H - th;
   // Main building
@@ -442,27 +443,48 @@ function drawTerminal() {
   ctx.fillRect(tx, ty, tw, 5);
   // Label
   ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 13px sans-serif';
+  ctx.font = 'bold 16px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('\u2708 TERMINAL', tx + tw / 2, ty + th / 2);
+  ctx.fillText('\u2708 TERMINAL', tx + tw / 2, ty + th / 2 + 10);
   // Control tower (circle, right side)
-  const ctX = tx + tw - 40;
-  const ctY = ty + th / 2;
+  const ctX = tx + tw - 50;
+  const ctY = ty + 25;
   ctx.fillStyle = '#8ac4e0';
   ctx.beginPath();
-  ctx.arc(ctX, ctY, 14, 0, Math.PI * 2);
+  ctx.arc(ctX, ctY, 16, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#143b5e';
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.fillStyle = '#ef476f'; // beacon
   ctx.beginPath();
-  ctx.arc(ctX, ctY, 4, 0, Math.PI * 2);
+  ctx.arc(ctX, ctY, 5, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 8px sans-serif';
-  ctx.fillText('TWR', ctX, ctY + 20);
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillText('TWR', ctX, ctY + 24);
+
+  // Jet bridges from terminal roof to each gate
+  state.gates.forEach((g) => {
+    const bx = g.x + g.w / 2;
+    const bridgeTop = g.y + g.h; // bottom of gate
+    const bridgeBot = ty; // top of terminal
+    // Bridge corridor
+    ctx.fillStyle = '#9ca3ab';
+    ctx.fillRect(bx - 5, bridgeTop, 10, bridgeBot - bridgeTop);
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx - 5, bridgeTop, 10, bridgeBot - bridgeTop);
+    // Connector circles at ends
+    ctx.fillStyle = '#777';
+    ctx.beginPath();
+    ctx.arc(bx, bridgeTop, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(bx, bridgeBot, 6, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 function drawGate(g) {
