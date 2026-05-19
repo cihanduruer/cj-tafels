@@ -409,19 +409,23 @@ function drawTaxiways() {
   if (!state.gates.length) return;
   const ry = H * 0.45;
   const rh = Math.max(28, H * 0.06);
-  const taxiW = 20;
+  const taxiW = 36;
   // Horizontal taxiway below runway
-  const taxiY = ry + rh + 10;
-  const taxiH = 20;
-  ctx.fillStyle = '#555';
-  ctx.fillRect(W * 0.15, taxiY, W * 0.7, taxiH);
+  const taxiY = ry + rh + 12;
+  const taxiH = 36;
+  ctx.fillStyle = '#4a4a4a';
+  ctx.fillRect(W * 0.1, taxiY, W * 0.8, taxiH);
+  // White edge lines
+  ctx.fillStyle = '#888';
+  ctx.fillRect(W * 0.1, taxiY, W * 0.8, 2);
+  ctx.fillRect(W * 0.1, taxiY + taxiH - 2, W * 0.8, 2);
   // Yellow centerline
   ctx.strokeStyle = '#ffd166';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([12, 8]);
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 10]);
   ctx.beginPath();
-  ctx.moveTo(W * 0.15, taxiY + taxiH / 2);
-  ctx.lineTo(W * 0.85, taxiY + taxiH / 2);
+  ctx.moveTo(W * 0.1, taxiY + taxiH / 2);
+  ctx.lineTo(W * 0.9, taxiY + taxiH / 2);
   ctx.stroke();
   ctx.setLineDash([]);
   // Vertical spurs from taxiway down to each gate
@@ -429,12 +433,16 @@ function drawTaxiways() {
     const cx = g.x + g.w / 2;
     const spurTop = taxiY + taxiH;
     const spurBot = g.y;
-    ctx.fillStyle = '#555';
+    ctx.fillStyle = '#4a4a4a';
     ctx.fillRect(cx - taxiW / 2, spurTop, taxiW, spurBot - spurTop);
+    // Edge markings
+    ctx.fillStyle = '#888';
+    ctx.fillRect(cx - taxiW / 2, spurTop, 2, spurBot - spurTop);
+    ctx.fillRect(cx + taxiW / 2 - 2, spurTop, 2, spurBot - spurTop);
     // yellow centerline on spur
     ctx.strokeStyle = '#ffd166';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 6]);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 8]);
     ctx.beginPath();
     ctx.moveTo(cx, spurTop);
     ctx.lineTo(cx, spurBot);
