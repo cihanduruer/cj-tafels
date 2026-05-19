@@ -272,7 +272,7 @@ function updatePlane(now) {
     p.scale = 1 - 0.3 * easeInOutCubic(t);
     if (t >= 1) {
       const tx = target.x + target.w / 2;
-      const ty = target.y - 12;
+      const ty = target.y + target.h * 0.5;
       state.parkedAt.push({ x: tx, y: ty, scale: 0.65, angle: Math.PI / 2 });
       state.phase = 'idle';
       p.visible = false;
@@ -1018,7 +1018,7 @@ function startLanding(gate) {
   const connX = W * 0.5; // connector center
   const taxiCenterY = taxiY + taxiH / 2;
   const gateX = gate.x + gate.w / 2;
-  const gateY = gate.y - 12;
+  const gateY = gate.y + gate.h * 0.5;
   const sx = state.plane.x;
   const sy = state.plane.y;
 
