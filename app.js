@@ -144,7 +144,7 @@ function nextQuestion() {
   $('feedback').className = 'feedback';
 
   buildGates(a * b);
-  setPhase('approaching');
+  setPhase('incoming');
 }
 
 function buildGates(correct) {
@@ -172,15 +172,17 @@ function setPhase(phase) {
   state.clickEnabled = false;
   state.plane.visible = true;
 
-  if (phase === 'approaching') {
-    state.phaseDuration = 3000; // 3s slow descent toward strip
+  if (phase === 'incoming') {
+    state.phaseDuration = 1200; // quick entry to align with runway
+  } else if (phase === 'onstrip') {
+    state.phaseDuration = 3000; // 3s flying along runway, user must answer
     state.clickEnabled = true;
   } else if (phase === 'landing') {
-    state.phaseDuration = 2400;
+    state.phaseDuration = 2200;
   } else if (phase === 'passthru') {
-    state.phaseDuration = 1600; // fly past off-screen left
+    state.phaseDuration = 1200;
   } else if (phase === 'flyaway') {
-    state.phaseDuration = 1800;
+    state.phaseDuration = 1600;
   }
 }
 
@@ -200,87 +202,94 @@ function updatePlane(now) {
   const p = state.plane;
   const elapsed = now - state.phaseStart;
 
-  // Approaching: plane enters from top, descends toward runway over 3s
-  if (state.phase === 'approaching') {
+  // Runway Y center (must match drawRunway)
+  const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
+
+  if (state.phase === 'incoming') {
+    // Enter from right side, descend and align horizontally with the runway
+    const t = Math.min(elapsed / state.phaseDuration, 1);
+    const e = easeOutCubic(t);
+    const startX = W + 60;
+    const startY = H * 0.15;
+    const endX = W * 0.82;  // right end of runway
+    const endY = runwayY;
+    p.x = startX + (endX - startX) * e;
+    p.y = startY + (endY - startY) * e;
+    // Rotate from approach angle to horizontal (pointing left = PI)
+    const approachAngle = Math.atan2(endY - startY, endX - startX);
+    p.angle = lerpAngle(approachAngle, Math.PI, easeOutCubic(t));
+    p.scale = 0.7 + 0.3 * e;
+    if (t >= 1) setPhase('onstrip');
+  } else if (state.phase === 'onstrip') {
+    // Fly along runway from right to left over 3 seconds (aligned horizontal)
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInOutCubic(t);
-    // Enter from upper-right, fly diagonally to runway center
-    const startX = W * 0.85;
-    const startY = -60;
-    const endX = W * 0.5;
-    const endY = H * 0.48; // just above runway
+    const startX = W * 0.82;
+    const endX = W * 0.18;
     p.x = startX + (endX - startX) * e;
-    p.y = startY + (endY - startY) * easeOutCubic(t);
-    // Heading: toward lower-left (top-down angle: nose direction)
-    const baseAngle = Math.atan2(endY - startY, endX - startX);
-    p.angle = baseAngle;
-    p.scale = 0.6 + 0.4 * easeOutCubic(t); // grow as it gets closer
+    p.y = runwayY;
+    p.angle = Math.PI; // nose pointing left
+    p.scale = 1;
     if (t >= 1) {
       onTimeout();
     }
   } else if (state.phase === 'landing') {
+    // Taxi from current position down to the correct gate
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInOutCubic(t);
     const target = state.landTarget;
     const sx = state.landFrom.x, sy = state.landFrom.y;
     const tx = target.x + target.w / 2;
-    const ty = target.y - 10; // just above the gate
-    // Smooth cubic bezier: arc down to gate
-    const c1x = sx;
-    const c1y = sy + (ty - sy) * 0.4;
-    const c2x = tx;
-    const c2y = sy + (ty - sy) * 0.7;
-    const mt = 1 - e;
-    const x = mt*mt*mt*sx + 3*mt*mt*e*c1x + 3*mt*e*e*c2x + e*e*e*tx;
-    const y = mt*mt*mt*sy + 3*mt*mt*e*c1y + 3*mt*e*e*c2y + e*e*e*ty;
-    // Tangent for angle
-    const tdx = 3*mt*mt*(c1x-sx) + 6*mt*e*(c2x-c1x) + 3*e*e*(tx-c2x);
-    const tdy = 3*mt*mt*(c1y-sy) + 6*mt*e*(c2y-c1y) + 3*e*e*(ty-c2y);
-    p.x = x;
-    p.y = y;
-    // Smoothly settle to pointing down (PI/2) at the end
-    const moveAngle = Math.atan2(tdy, tdx);
-    const settle = Math.max(0, (e - 0.7) / 0.3);
-    p.angle = lerpAngle(moveAngle, Math.PI / 2, easeOutCubic(settle));
-    p.scale = 1 - 0.4 * easeInOutCubic(t); // shrink as it parks
+    const ty = target.y - 12;
+    // Two-phase movement: first move horizontal to align with gate, then move down
+    const phase1End = 0.4; // first 40% = horizontal align
+    if (t < phase1End) {
+      const lt = t / phase1End;
+      const le = easeInOutCubic(lt);
+      p.x = sx + (tx - sx) * le;
+      p.y = sy;
+      p.angle = Math.PI; // still pointing left while taxiing horizontally
+    } else {
+      const lt = (t - phase1End) / (1 - phase1End);
+      const le = easeInOutCubic(lt);
+      p.x = tx;
+      p.y = sy + (ty - sy) * le;
+      // Rotate from pointing left (PI) to pointing down (PI/2)
+      p.angle = lerpAngle(Math.PI, Math.PI / 2, easeOutCubic(lt));
+    }
+    p.scale = 1 - 0.35 * easeInOutCubic(t);
     if (t >= 1) {
-      state.parkedAt.push({ x: tx, y: ty, scale: 0.55, angle: Math.PI / 2 });
+      state.parkedAt.push({ x: tx, y: ty, scale: 0.6, angle: Math.PI / 2 });
       state.phase = 'idle';
       p.visible = false;
       setTimeout(nextQuestion, 800);
     }
   } else if (state.phase === 'passthru') {
+    // Continue flying left off-screen
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInCubic(t);
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    // Continue past → exit bottom-left
     const tx = -100;
-    const ty = H + 80;
     p.x = sx + (tx - sx) * e;
-    p.y = sy + (ty - sy) * e;
-    p.angle = Math.atan2(ty - sy, tx - sx);
-    p.scale = 1 - 0.3 * t;
+    p.y = sy;
+    p.angle = Math.PI; // keep pointing left
+    p.scale = 1 - 0.2 * t;
     if (t >= 1) {
       p.visible = false;
       state.phase = 'idle';
       setTimeout(nextQuestion, 200);
     }
   } else if (state.phase === 'flyaway') {
+    // Climb away upward-left
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInCubic(t);
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    // Climb back up → exit top-left
-    const tx = -100;
-    const ty = -100;
-    const cx = sx + (tx - sx) * 0.3;
-    const cy = sy - Math.abs(sy - ty) * 0.5;
-    const mt = 1 - e;
-    p.x = mt*mt*sx + 2*mt*e*cx + e*e*tx;
-    p.y = mt*mt*sy + 2*mt*e*cy + e*e*ty;
-    const tdx = 2*mt*(cx-sx) + 2*e*(tx-cx);
-    const tdy = 2*mt*(cy-sy) + 2*e*(ty-cy);
-    p.angle = Math.atan2(tdy, tdx);
-    p.scale = 1 - 0.4 * easeInOutCubic(t);
+    const tx = -80;
+    const ty = -80;
+    p.x = sx + (tx - sx) * e;
+    p.y = sy + (ty - sy) * e;
+    p.angle = lerpAngle(Math.PI, Math.PI + 0.6, easeOutCubic(t)); // nose up-left
+    p.scale = 1 - 0.4 * t;
     if (t >= 1) {
       p.visible = false;
       state.phase = 'idle';
@@ -335,7 +344,7 @@ function draw() {
 
   // UI overlays
   drawBanner();
-  if (state.phase === 'approaching') drawCountdown();
+  if (state.phase === 'onstrip') drawCountdown();
   drawTablePlacard();
 }
 
