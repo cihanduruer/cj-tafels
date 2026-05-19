@@ -306,15 +306,47 @@ function updatePlane(now) {
 }
 
 // === Drawing (top-down bird's eye view) ===
+
+// Day/night based on device time
+function getTimeOfDay() {
+  const hour = new Date().getHours();
+  // Returns: { grassColor, skyOverlay (rgba), runwayColor, roadColor, brightness (0-1) }
+  if (hour >= 6 && hour < 8) {
+    // Sunrise
+    const t = (hour - 6 + new Date().getMinutes() / 60) / 2;
+    return { grass: lerpColor('#2a4a20', '#5da84a', t), overlay: `rgba(255,140,50,${0.15*(1-t)})`, runway: '#2d2d2d', road: '#3d3d3d', brightness: 0.6 + 0.4 * t };
+  } else if (hour >= 8 && hour < 18) {
+    // Day
+    return { grass: '#5da84a', overlay: 'rgba(0,0,0,0)', runway: '#2d2d2d', road: '#3d3d3d', brightness: 1 };
+  } else if (hour >= 18 && hour < 20) {
+    // Sunset
+    const t = (hour - 18 + new Date().getMinutes() / 60) / 2;
+    return { grass: lerpColor('#5da84a', '#2a4a20', t), overlay: `rgba(255,100,30,${0.12*t})`, runway: lerpColor('#2d2d2d', '#1a1a1a', t), road: lerpColor('#3d3d3d', '#222', t), brightness: 1 - 0.4 * t };
+  } else {
+    // Night (20:00 - 06:00)
+    return { grass: '#1e3518', overlay: 'rgba(10,10,40,0.35)', runway: '#1a1a1a', road: '#1a1a1a', brightness: 0.4 };
+  }
+}
+
+function lerpColor(a, b, t) {
+  const pa = [parseInt(a.slice(1,3),16), parseInt(a.slice(3,5),16), parseInt(a.slice(5,7),16)];
+  const pb = [parseInt(b.slice(1,3),16), parseInt(b.slice(3,5),16), parseInt(b.slice(5,7),16)];
+  const r = Math.round(pa[0] + (pb[0]-pa[0]) * t);
+  const g = Math.round(pa[1] + (pb[1]-pa[1]) * t);
+  const bl = Math.round(pa[2] + (pb[2]-pa[2]) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
 function draw() {
   const now = performance.now() / 1000;
+  const tod = getTimeOfDay();
 
-  // Green grass background
-  ctx.fillStyle = '#5da84a';
+  // Green grass background (time-adjusted)
+  ctx.fillStyle = tod.grass;
   ctx.fillRect(0, 0, W, H);
 
   // Road at the very top
-  drawRoad();
+  drawRoad(tod);
 
   // Terminal building (bottom)
   drawTerminal();
@@ -323,7 +355,7 @@ function draw() {
   drawTaxiways();
 
   // Runway (horizontal, middle)
-  drawRunway();
+  drawRunway(tod);
 
   // Gates (parking spots below runway)
   state.gates.forEach(drawGate);
@@ -339,17 +371,28 @@ function draw() {
     drawPlaneTopDown(p.x, p.y, p.angle, p.scale);
   }
 
+  // Day/night overlay
+  if (tod.overlay !== 'rgba(0,0,0,0)') {
+    ctx.fillStyle = tod.overlay;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Night runway lights
+  if (tod.brightness < 0.7) {
+    drawRunwayLights();
+  }
+
   // UI overlays
   if (state.clickEnabled) drawBanner();
   if (state.phase === 'incoming' && state.clickEnabled) drawCountdown();
   drawTablePlacard();
 }
 
-function drawRoad() {
+function drawRoad(tod) {
   // Horizontal road at the top with lane markings
   const ry = H * 0.02;
   const rh = H * 0.05;
-  ctx.fillStyle = '#3d3d3d';
+  ctx.fillStyle = tod.road;
   ctx.fillRect(0, ry, W, rh);
   // White dashed center line
   ctx.strokeStyle = '#fff';
@@ -366,16 +409,16 @@ function drawRoad() {
   ctx.fillRect(0, ry + rh - 2, W, 2);
 }
 
-function drawRunway() {
+function drawRunway(tod) {
   const ry = H * 0.40;
   const rh = Math.max(32, H * 0.07);
   const rx = W * 0.1;
   const rw = W * 0.8;
   // Green grass shoulders
-  ctx.fillStyle = '#6abf45';
+  ctx.fillStyle = tod.grass;
   ctx.fillRect(rx - 8, ry - 10, rw + 16, rh + 20);
   // Asphalt
-  ctx.fillStyle = '#2d2d2d';
+  ctx.fillStyle = tod.runway;
   ctx.fillRect(rx, ry, rw, rh);
   // White edge lines
   ctx.fillStyle = '#fff';
@@ -406,6 +449,33 @@ function drawRunway() {
   ctx.textBaseline = 'middle';
   ctx.fillText('09', rx + 65, ry + rh / 2);
   ctx.fillText('27', rx + rw - 65, ry + rh / 2);
+}
+
+function drawRunwayLights() {
+  const ry = H * 0.40;
+  const rh = Math.max(32, H * 0.07);
+  const rx = W * 0.1;
+  const rw = W * 0.8;
+  // Edge lights (white dots along runway edges)
+  const spacing = 30;
+  for (let x = rx; x <= rx + rw; x += spacing) {
+    ctx.fillStyle = 'rgba(255,255,200,0.9)';
+    ctx.beginPath(); ctx.arc(x, ry - 2, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, ry + rh + 2, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // Threshold lights (green at start, red at end)
+  for (let i = 0; i < 6; i++) {
+    const ly = ry + 4 + i * (rh - 8) / 5;
+    ctx.fillStyle = 'rgba(0,255,80,0.9)';
+    ctx.beginPath(); ctx.arc(rx - 5, ly, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,50,50,0.9)';
+    ctx.beginPath(); ctx.arc(rx + rw + 5, ly, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  // Gate area lights (amber dots near gates)
+  state.gates.forEach((g) => {
+    ctx.fillStyle = 'rgba(255,180,50,0.7)';
+    ctx.beginPath(); ctx.arc(g.x + g.w / 2, g.y - 8, 3, 0, Math.PI * 2); ctx.fill();
+  });
 }
 
 function drawTaxiways() {
