@@ -159,9 +159,9 @@ function setPhase(phase) {
   if (phase === 'incoming') {
     state.phaseDuration = 8000; // total 8s: ~3s approach + 5s on strip
     // Random spawn point (different directions each time)
-    const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
-    const runwayRight = W * 0.8;
-    const runwayLeft = W * 0.2;
+    const runwayY = H * 0.28 + Math.max(32, H * 0.07) / 2;
+    const runwayRight = W * 0.9;
+    const runwayLeft = W * 0.1;
     const spawns = [
       { x: W + 100, y: H * 0.08 },   // top-right
       { x: W + 100, y: H * 0.5 },    // mid-right
@@ -208,7 +208,7 @@ function updatePlane(now) {
   const elapsed = now - state.phaseStart;
 
   // Runway Y center (must match drawRunway)
-  const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
+  const runwayY = H * 0.28 + Math.max(32, H * 0.07) / 2;
 
   if (state.phase === 'incoming') {
     // Continuous smooth flight along entire path (approach + on strip)
@@ -397,10 +397,10 @@ function drawRoad() {
 }
 
 function drawRunway() {
-  const ry = H * 0.45;
+  const ry = H * 0.28;
   const rh = Math.max(32, H * 0.07);
-  const rx = W * 0.15;
-  const rw = W * 0.7;
+  const rx = W * 0.1;
+  const rw = W * 0.8;
   // Green grass shoulders
   ctx.fillStyle = '#6abf45';
   ctx.fillRect(rx - 8, ry - 10, rw + 16, rh + 20);
@@ -440,25 +440,25 @@ function drawRunway() {
 
 function drawTaxiways() {
   if (!state.gates.length) return;
-  const ry = H * 0.45;
-  const rh = Math.max(28, H * 0.06);
-  const taxiW = 36;
-  // Horizontal taxiway below runway
-  const taxiY = ry + rh + 12;
-  const taxiH = 36;
-  ctx.fillStyle = '#4a4a4a';
-  ctx.fillRect(W * 0.1, taxiY, W * 0.8, taxiH);
+  const ry = H * 0.28;
+  const rh = Math.max(32, H * 0.07);
+  const taxiW = 60;
+  // Horizontal taxiway below runway with good gap
+  const taxiY = ry + rh + 40;
+  const taxiH = 60;
+  ctx.fillStyle = '#3d3d3d';
+  ctx.fillRect(W * 0.06, taxiY, W * 0.88, taxiH);
   // White edge lines
-  ctx.fillStyle = '#888';
-  ctx.fillRect(W * 0.1, taxiY, W * 0.8, 2);
-  ctx.fillRect(W * 0.1, taxiY + taxiH - 2, W * 0.8, 2);
+  ctx.fillStyle = '#777';
+  ctx.fillRect(W * 0.06, taxiY, W * 0.88, 2);
+  ctx.fillRect(W * 0.06, taxiY + taxiH - 2, W * 0.88, 2);
   // Yellow centerline
   ctx.strokeStyle = '#ffd166';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([14, 10]);
+  ctx.lineWidth = 4;
+  ctx.setLineDash([18, 12]);
   ctx.beginPath();
-  ctx.moveTo(W * 0.1, taxiY + taxiH / 2);
-  ctx.lineTo(W * 0.9, taxiY + taxiH / 2);
+  ctx.moveTo(W * 0.06, taxiY + taxiH / 2);
+  ctx.lineTo(W * 0.94, taxiY + taxiH / 2);
   ctx.stroke();
   ctx.setLineDash([]);
   // Vertical spurs from taxiway down to each gate
