@@ -54,8 +54,8 @@ function layoutGates() {
   if (!state.gates.length) return;
   const n = state.gates.length;
   // Gates are positioned horizontally below the runway (like parking bays)
-  const gateW = Math.min(130, (W - 60) / n - 12);
-  const gateH = Math.min(80, H * 0.15);
+  const gateW = Math.min(260, (W - 60) / n - 12);
+  const gateH = Math.min(160, H * 0.30);
   const gap = 14;
   const totalW = gateW * n + gap * (n - 1);
   const startX = (W - totalW) / 2;
@@ -173,7 +173,7 @@ function setPhase(phase) {
   state.plane.visible = true;
 
   if (phase === 'incoming') {
-    state.phaseDuration = 1200; // quick entry to align with runway
+    state.phaseDuration = 5000; // 5s slow entry to align with runway
   } else if (phase === 'onstrip') {
     state.phaseDuration = 3000; // 3s flying along runway, user must answer
     state.clickEnabled = true;
