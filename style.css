@@ -274,7 +274,12 @@ body.game-active { overflow: hidden; }
   background: linear-gradient(180deg, #4fa3d6 0%, #87ceeb 45%, #ffd166 90%, #ef8a4f 100%);
   overflow-y: auto;
 }
-.cloud4 { top: 40%; left: -25%; font-size: 70px; animation: drift 48s linear infinite; animation-delay: -15s; }
+/* Bigger, fluffier clouds on the welcome screen */
+.welcome-body .cloud  { font-size: 110px; opacity: 0.95; }
+.welcome-body .cloud1 { font-size: 120px; top: 8%; }
+.welcome-body .cloud2 { font-size: 160px; top: 22%; }
+.welcome-body .cloud3 { font-size: 95px;  top: 4%; }
+.cloud4 { top: 42%; left: -25%; font-size: 140px; animation: drift 48s linear infinite; animation-delay: -15s; }
 
 .welcome {
   position: relative;
