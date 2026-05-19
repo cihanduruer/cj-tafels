@@ -280,20 +280,21 @@ function updatePlane(now) {
       setTimeout(nextQuestion, 800);
     }
   } else if (state.phase === 'flyaway') {
-    // Smooth climb out - no stopping, gain altitude and fly off screen
+    // Smooth climb out - continue current direction and gain altitude
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInOutCubic(t);
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    // Fly upward-left with a smooth arc
-    const tx = sx - W * 0.6;
-    const ty = -120;
+    const startAngle = state.flyFromAngle || Math.PI;
+    // Continue in roughly the same direction, curving upward
+    const speed = W * 0.5;
+    const climbAngle = startAngle - 0.5; // pitch up slightly from current heading
+    const tx = sx + Math.cos(climbAngle) * speed;
+    const ty = sy + Math.sin(climbAngle) * speed - H * 0.3;
+    const e = easeInOutCubic(t);
     p.x = sx + (tx - sx) * e;
-    // Arc upward with a curve
-    const midY = sy - H * 0.1;
-    p.y = sy + (midY - sy) * easeOutCubic(t) + (ty - midY) * easeInCubic(t);
-    // Smoothly pitch up
-    p.angle = lerpAngle(Math.PI, Math.PI + 0.7, easeOutCubic(t));
-    p.scale = 1 - 0.5 * easeInOutCubic(t);
+    p.y = sy + (ty - sy) * e;
+    // Smoothly rotate toward climb angle
+    p.angle = lerpAngle(startAngle, climbAngle, easeOutCubic(t));
+    p.scale = 1 - 0.4 * easeInOutCubic(t);
     if (t >= 1) {
       p.visible = false;
       state.phase = 'idle';
@@ -986,6 +987,7 @@ function onGateChosen(gate) {
     fb.className = 'feedback bad';
     state.mistakes.push({ a, b, correct, answer: gate.value });
     state.flyFrom = { x: state.plane.x, y: state.plane.y };
+    state.flyFromAngle = state.plane.angle;
     setPhase('flyaway');
   }
 }
@@ -1003,6 +1005,7 @@ function onTimeout() {
   fb.className = 'feedback bad';
   state.mistakes.push({ a, b, correct, answer: null });
   state.flyFrom = { x: state.plane.x, y: state.plane.y };
+  state.flyFromAngle = state.plane.angle;
   setPhase('flyaway');
 }
 
