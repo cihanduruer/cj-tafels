@@ -58,29 +58,6 @@ body {
 }
 .home-link:active { transform: scale(0.95); }
 
-.game-actions-top {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 8px;
-  z-index: 100;
-}
-.touch-btn {
-  background: rgba(255,255,255,0.85);
-  border: 2px solid #143b5e;
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: bold;
-  color: #143b5e;
-  text-decoration: none;
-  cursor: pointer;
-  touch-action: manipulation;
-  white-space: nowrap;
-}
-.touch-btn:active { background: #cde6f7; transform: scale(0.95); }
-
 .sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
 .cloud { position: absolute; font-size: 60px; opacity: 0.9; animation: drift 30s linear infinite; pointer-events: none; }
 .cloud1 { top: 10%; left: -10%; animation-duration: 40s; }
@@ -231,12 +208,36 @@ h1 { font-size: 2.4rem; margin: 10px 0 5px; text-shadow: 2px 2px 0 #fff; }
 
 .hud {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-weight: bold;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  background: rgba(20,59,94,0.92);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
   gap: 8px;
+  flex-wrap: nowrap;
+  margin-bottom: 8px;
 }
+.hud-left { display: flex; gap: 6px; flex-shrink: 0; }
+.hud-center { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+.hud-right { flex-shrink: 0; }
+.hud-sep { opacity: 0.4; }
+.hud-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.4);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+.hud-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
 
 /* === Scene === */
 .scene {
@@ -276,7 +277,7 @@ h1 { font-size: 2.4rem; margin: 10px 0 5px; text-shadow: 2px 2px 0 #fff; }
   min-height: 220px;
   margin-bottom: 0;
 }
-#game:not(.hidden) .hud { margin-bottom: 0; }
+#game:not(.hidden) .hud { margin-bottom: 4px; flex-shrink: 0; }
 body.game-active { overflow: hidden; }
 
 .feedback {

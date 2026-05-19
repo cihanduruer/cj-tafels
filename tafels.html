@@ -35,9 +35,18 @@
     <!-- Het spel -->
     <section id="game" class="card hidden">
       <div class="hud">
-        <div>Tafel van <span id="currentTable">?</span></div>
-        <div>Score: <span id="score">0</span></div>
-        <div>Vraag <span id="questionNum">1</span> / <span id="totalQuestions">10</span></div>
+        <div class="hud-left">
+          <button id="backBtn" class="hud-btn">⬅️ Tafel kiezen</button>
+          <a href="index.html" class="hud-btn">🏠 Start</a>
+        </div>
+        <div class="hud-center">
+          <span>Tafel van <strong id="currentTable">?</strong></span>
+          <span class="hud-sep">|</span>
+          <span>Score: <strong id="score">0</strong></span>
+          <span class="hud-sep">|</span>
+          <span>Vraag <strong id="questionNum">1</strong>/<strong id="totalQuestions">10</strong></span>
+        </div>
+        <div class="hud-right"></div>
       </div>
 
       <div class="scene" id="scene">
@@ -45,11 +54,6 @@
       </div>
 
       <div id="feedback" class="feedback"></div>
-
-      <div class="game-actions-top">
-        <button id="backBtn" class="touch-btn">⬅️ Tafel kiezen</button>
-        <a href="index.html" class="touch-btn">🏠 Start</a>
-      </div>
     </section>
 
     <!-- Einde -->
