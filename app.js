@@ -515,22 +515,31 @@ function drawTerminal() {
 
 function drawGate(g) {
   const r = 8;
-  // Press flash feedback
+  // Press feedback - strong button click feel
   let pressScale = 1;
+  let pressOffsetY = 0;
   let glowAlpha = 0;
   if (g.pressTime) {
     const elapsed = performance.now() - g.pressTime;
-    if (elapsed < 300) {
-      pressScale = 1 - 0.05 * Math.sin(Math.PI * elapsed / 300);
-      glowAlpha = 0.4 * (1 - elapsed / 300);
+    if (elapsed < 150) {
+      // Quick squish down
+      const t = elapsed / 150;
+      pressScale = 1 - 0.12 * Math.sin(Math.PI * t);
+      pressOffsetY = 4 * Math.sin(Math.PI * t);
+      glowAlpha = 0.7;
+    } else if (elapsed < 400) {
+      // Bounce back
+      const t = (elapsed - 150) / 250;
+      pressScale = 1 + 0.03 * Math.sin(Math.PI * t);
+      glowAlpha = 0.5 * (1 - t);
     }
   }
 
   ctx.save();
-  // Scale from center for press effect
+  // Scale + offset from center for press effect
   const cx = g.x + g.w / 2;
   const cy = g.y + g.h / 2;
-  ctx.translate(cx, cy);
+  ctx.translate(cx, cy + pressOffsetY);
   ctx.scale(pressScale, pressScale);
   ctx.translate(-cx, -cy);
 
