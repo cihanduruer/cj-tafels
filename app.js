@@ -1,5 +1,19 @@
 // Tafels Vliegveld - canvas versie met realistisch vliegveld
 const TOTAL_QUESTIONS = 10;
+const HOVER_TIMEOUT_MS = 3000;     // tijd om te antwoorden
+const FAST_ANSWER_MS = 1000;       // grens voor "Wow FAST!"
+const HIGHSCORE_PREFIX = 'cj-tafels-highscore-';
+
+function highScoreKey(table) {
+  return HIGHSCORE_PREFIX + (table === null ? 'mix' : table);
+}
+function getHighScore(table) {
+  try { return parseInt(localStorage.getItem(highScoreKey(table)) || '0', 10) || 0; }
+  catch (_) { return 0; }
+}
+function setHighScore(table, score) {
+  try { localStorage.setItem(highScoreKey(table), String(score)); } catch (_) {}
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,7 +78,8 @@ window.addEventListener('resize', () => {
 const tableButtons = $('tableButtons');
 for (let i = 1; i <= 10; i++) {
   const btn = document.createElement('button');
-  btn.textContent = i;
+  const hs = getHighScore(i);
+  btn.innerHTML = `${i}` + (hs > 0 ? `<span class="hs">🏆 ${hs}</span>` : '');
   btn.addEventListener('click', () => startGame(i));
   tableButtons.appendChild(btn);
 }
@@ -104,6 +119,7 @@ function startGame(table) {
   state.score = 0;
   state.mistakes = [];
   state.parkedAt = [];
+  state.fastCount = 0;
   $('menu').classList.add('hidden');
   $('result').classList.add('hidden');
   $('game').classList.remove('hidden');
@@ -197,6 +213,10 @@ function updatePlane(now) {
     p.y = hoverY + Math.sin(t * 2) * 6;
     p.angle = Math.sin(t * 2) * 0.05;
     p.scale = 1;
+    // 3-second time limit to answer
+    if (state.clickEnabled && elapsed >= HOVER_TIMEOUT_MS) {
+      onTimeout();
+    }
   } else if (state.phase === 'landing') {
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInOut(t);
@@ -301,6 +321,9 @@ function draw() {
 
   // Question banner at top
   drawBanner();
+
+  // Countdown bar while waiting for an answer
+  if (state.phase === 'hovering') drawCountdown();
 
   // "Tafel van X" placard top-left
   drawTablePlacard();
@@ -525,6 +548,27 @@ function drawBanner() {
   ctx.fillText(text, W / 2, by + bh / 2);
 }
 
+function drawCountdown() {
+  const elapsed = performance.now() - state.phaseStart;
+  const remain = Math.max(0, 1 - elapsed / HOVER_TIMEOUT_MS);
+  const barMaxW = Math.min(280, W * 0.5);
+  const barH = 10;
+  const bx = (W - barMaxW) / 2;
+  const by = 56; // just below the question banner
+  // track
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  roundRect(bx, by, barMaxW, barH, 5); ctx.fill();
+  // fill (green -> orange -> red)
+  let color = '#06d6a0';
+  if (remain < 0.5) color = '#ffd166';
+  if (remain < 0.25) color = '#ef476f';
+  ctx.fillStyle = color;
+  roundRect(bx, by, barMaxW * remain, barH, 5); ctx.fill();
+  ctx.strokeStyle = '#143b5e';
+  ctx.lineWidth = 1.5;
+  roundRect(bx, by, barMaxW, barH, 5); ctx.stroke();
+}
+
 function drawTablePlacard() {
   const label = state.table === null ? 'Tafel: mix 🎲' : `Tafel van ${state.table}`;
   ctx.font = 'bold 18px sans-serif';
@@ -747,11 +791,18 @@ function onGateChosen(gate) {
   state.clickEnabled = false;
   const { correct, a, b } = state.current;
   const fb = $('feedback');
+  const answerMs = performance.now() - state.phaseStart;
   if (gate.value === correct) {
     state.score++;
     gate.status = 'correct';
-    fb.textContent = '✅ Goed zo! Het vliegtuig landt bij ' + gate.label;
-    fb.className = 'feedback good';
+    const fast = answerMs <= FAST_ANSWER_MS;
+    if (fast) {
+      state.fastCount = (state.fastCount || 0) + 1;
+      fb.textContent = `🚀 Wow FAST! Goed zo! Het vliegtuig landt bij ${gate.label}`;
+    } else {
+      fb.textContent = '✅ Goed zo! Het vliegtuig landt bij ' + gate.label;
+    }
+    fb.className = 'feedback good' + (fast ? ' fast' : '');
     $('score').textContent = state.score;
     startLanding(gate);
   } else {
@@ -765,6 +816,19 @@ function onGateChosen(gate) {
     state.flyFrom = { x: state.plane.x, y: state.plane.y };
     setPhase('flyaway');
   }
+}
+
+function onTimeout() {
+  state.clickEnabled = false;
+  const { correct, a, b } = state.current;
+  const fb = $('feedback');
+  const correctGate = state.gates.find((g) => g.value === correct);
+  if (correctGate) correctGate.status = 'correct';
+  fb.textContent = `⏰ Te laat! ${a} × ${b} = ${correct}. Het vliegtuig vliegt weg!`;
+  fb.className = 'feedback bad';
+  state.mistakes.push({ a, b, correct, answer: null });
+  state.flyFrom = { x: state.plane.x, y: state.plane.y };
+  setPhase('flyaway');
 }
 
 function startLanding(gate) {
@@ -795,7 +859,17 @@ function showResult() {
   else if (score >= 7) title.textContent = '✈️ Goed gevlogen, piloot!';
   else title.textContent = '👨‍✈️ Nog even oefenen, piloot!';
 
-  let msg = `Je had ${score} van de ${total} goed.`;
+  // High score handling
+  const prevHigh = getHighScore(state.table);
+  const isNewHigh = score > prevHigh;
+  if (isNewHigh) setHighScore(state.table, score);
+  const newHigh = isNewHigh ? score : prevHigh;
+
+  const tableLabel = state.table === null ? 'mix' : `tafel van ${state.table}`;
+  let msg = `Je had ${score} van de ${total} goed (${tableLabel}).`;
+  if (state.fastCount) msg += ` 🚀 ${state.fastCount}× supersnel!`;
+  if (isNewHigh) msg += ` 🎉 Nieuw record: ${score}!`;
+  else msg += ` Hoogste score: ${newHigh}.`;
   if (state.mistakes.length > 0) {
     msg += ' Foutjes: ' + state.mistakes.map((m) => `${m.a}×${m.b}=${m.correct}`).join(', ');
   }

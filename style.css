@@ -157,9 +157,32 @@ h1 { font-size: 2.4rem; margin: 10px 0 5px; text-shadow: 2px 2px 0 #fff; }
   font-weight: bold;
   font-family: inherit;
   transition: transform 0.1s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.1;
+}
+.table-grid button .hs {
+  font-size: 0.7rem;
+  font-weight: bold;
+  background: #143b5e;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 999px;
 }
 .table-grid button:hover { transform: scale(1.05); background: #ffbd33; }
 .table-grid button:active { transform: scale(0.95); }
+
+/* Fast-answer feedback pulse */
+.feedback.fast {
+  animation: fastPulse 0.5s ease-out;
+}
+@keyframes fastPulse {
+  0%   { transform: scale(0.85); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
 
 .big-btn {
   display: block;
