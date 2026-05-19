@@ -157,37 +157,37 @@ function setPhase(phase) {
   state.plane.visible = true;
 
   if (phase === 'incoming') {
-    state.phaseDuration = 4000; // 4s realistic approach circuit
+    state.phaseDuration = 8000; // total 8s: ~3s approach + 5s on strip
     // Random spawn point (different directions each time)
     const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
-    const runwayRight = W * 0.8; // threshold (right end of runway)
+    const runwayRight = W * 0.8;
+    const runwayLeft = W * 0.2;
     const spawns = [
-      { x: W + 80, y: H * 0.1 },   // top-right
-      { x: W + 80, y: H * 0.5 },   // mid-right
-      { x: W * 0.5, y: -80 },      // top-center
-      { x: W + 80, y: H * 0.8 },   // bottom-right
-      { x: W * 0.8, y: H + 80 },   // bottom
+      { x: W + 100, y: H * 0.08 },   // top-right
+      { x: W + 100, y: H * 0.5 },    // mid-right
+      { x: W * 0.5, y: -100 },       // top-center
+      { x: W + 100, y: H * 0.75 },   // bottom-right
+      { x: W * 0.85, y: H + 100 },   // bottom
     ];
     const spawn = spawns[Math.floor(Math.random() * spawns.length)];
-    // Store approach path waypoints: spawn → base turn → final approach → threshold
-    const baseX = runwayRight + W * 0.15;
-    const baseY = runwayY + (spawn.y > runwayY ? -H * 0.18 : H * 0.18);
+    // Continuous path: spawn → turn → final → threshold → along strip → exit left
+    // The plane never stops - constant smooth motion through all waypoints
+    const turnY = spawn.y > runwayY ? runwayY - H * 0.1 : runwayY + H * 0.1;
     state.approachPath = [
-      { x: spawn.x, y: spawn.y },
-      { x: baseX, y: spawn.y > runwayY ? runwayY - H * 0.12 : runwayY + H * 0.12 },
-      { x: runwayRight + 30, y: runwayY },
-      { x: runwayRight, y: runwayY },
+      { x: spawn.x, y: spawn.y },                          // 0: spawn
+      { x: runwayRight + W * 0.12, y: turnY },             // 1: base turn
+      { x: runwayRight + 20, y: runwayY },                 // 2: final approach
+      { x: runwayRight, y: runwayY },                      // 3: touchdown (click enabled here)
+      { x: W * 0.5, y: runwayY },                          // 4: mid-runway
+      { x: runwayLeft, y: runwayY },                       // 5: end of runway
     ];
+    // Click becomes enabled at ~37% progress (when reaching threshold)
+    state.clickEnableAt = 3 / 5; // segment 3 out of 5
     state.plane.scale = 0.5;
-  } else if (phase === 'onstrip') {
-    state.phaseDuration = 3000; // 3s flying along runway, user must answer
-    state.clickEnabled = true;
   } else if (phase === 'landing') {
-    state.phaseDuration = 2200;
-  } else if (phase === 'passthru') {
-    state.phaseDuration = 1200;
+    state.phaseDuration = 2500;
   } else if (phase === 'flyaway') {
-    state.phaseDuration = 1600;
+    state.phaseDuration = 2000;
   }
 }
 
@@ -211,103 +211,108 @@ function updatePlane(now) {
   const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
 
   if (state.phase === 'incoming') {
-    // Follow the approach path (Catmull-Rom-like through waypoints)
+    // Continuous smooth flight along entire path (approach + on strip)
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const path = state.approachPath;
-    const n = path.length - 1;
-    const segment = Math.min(Math.floor(t * n), n - 1);
-    const lt = (t * n) - segment;
-    const e = easeInOut(lt);
+    const n = path.length - 1; // number of segments
+
+    // Enable clicking once past the threshold point
+    if (t >= state.clickEnableAt && !state.clickEnabled) {
+      state.clickEnabled = true;
+    }
+
+    // Smooth cubic Bezier-like interpolation along path
+    const rawPos = t * n;
+    const segment = Math.min(Math.floor(rawPos), n - 1);
+    const lt = rawPos - segment;
+    // Use linear interpolation per segment for constant speed feel
     const from = path[segment];
     const to = path[segment + 1];
-    p.x = from.x + (to.x - from.x) * e;
-    p.y = from.y + (to.y - from.y) * e;
-    // Point nose in direction of travel
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const targetAngle = Math.atan2(dy, dx);
-    // On last segment, smoothly align to PI (pointing left for landing)
-    if (segment === n - 1) {
-      p.angle = lerpAngle(targetAngle, Math.PI, easeOutCubic(lt));
-    } else {
-      p.angle = targetAngle;
-    }
-    p.scale = 0.5 + 0.5 * easeOutCubic(t);
-    if (t >= 1) setPhase('onstrip');
-  } else if (state.phase === 'onstrip') {
-    // Fly along runway from right to left over 3 seconds (aligned horizontal)
-    const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInOutCubic(t);
-    const startX = W * 0.8;
-    const endX = W * 0.2;
-    p.x = startX + (endX - startX) * e;
-    p.y = runwayY;
-    p.angle = Math.PI; // nose pointing left
-    p.scale = 1;
+    p.x = from.x + (to.x - from.x) * lt;
+    p.y = from.y + (to.y - from.y) * lt;
+
+    // Smooth angle: look ahead in direction of travel
+    const lookAhead = Math.min(t + 0.05, 1) * n;
+    const laSeg = Math.min(Math.floor(lookAhead), n - 1);
+    const laLt = lookAhead - laSeg;
+    const laFrom = path[laSeg];
+    const laTo = path[laSeg + 1];
+    const laX = laFrom.x + (laTo.x - laFrom.x) * laLt;
+    const laY = laFrom.y + (laTo.y - laFrom.y) * laLt;
+    const targetAngle = Math.atan2(laY - p.y, laX - p.x);
+    // Smoothly interpolate angle
+    if (!state.prevAngle) state.prevAngle = targetAngle;
+    p.angle = lerpAngle(state.prevAngle, targetAngle, 0.12);
+    state.prevAngle = p.angle;
+
+    // Scale: grow from small to full as we approach
+    p.scale = Math.min(1, 0.45 + 0.55 * Math.min(t / state.clickEnableAt, 1));
+
     if (t >= 1) {
       onTimeout();
     }
   } else if (state.phase === 'landing') {
-    // Taxi from current position down to the correct gate
+    // Smooth taxi from current position down to the correct gate
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInOutCubic(t);
     const target = state.landTarget;
     const sx = state.landFrom.x, sy = state.landFrom.y;
     const tx = target.x + target.w / 2;
     const ty = target.y - 12;
-    // Two-phase movement: first move horizontal to align with gate, then move down
-    const phase1End = 0.4; // first 40% = horizontal align
-    if (t < phase1End) {
-      const lt = t / phase1End;
-      const le = easeInOutCubic(lt);
-      p.x = sx + (tx - sx) * le;
+    // Three-phase: decelerate on strip, turn toward gate, approach gate
+    const p1 = 0.3, p2 = 0.65;
+    if (t < p1) {
+      // Decelerate along runway
+      const lt = t / p1;
+      const e = easeOutCubic(lt);
+      p.x = sx + (tx - sx) * 0.5 * e;
       p.y = sy;
-      p.angle = Math.PI; // still pointing left while taxiing horizontally
-    } else {
-      const lt = (t - phase1End) / (1 - phase1End);
-      const le = easeInOutCubic(lt);
-      p.x = tx;
-      p.y = sy + (ty - sy) * le;
-      // Rotate from pointing left (PI) to pointing down (PI/2)
+      p.angle = Math.PI;
+    } else if (t < p2) {
+      // Turn toward gate
+      const lt = (t - p1) / (p2 - p1);
+      const e = easeInOutCubic(lt);
+      const midX = sx + (tx - sx) * 0.5;
+      p.x = midX + (tx - midX) * e;
+      p.y = sy + (ty - sy) * e * 0.5;
       p.angle = lerpAngle(Math.PI, Math.PI / 2, easeOutCubic(lt));
+    } else {
+      // Final approach to gate
+      const lt = (t - p2) / (1 - p2);
+      const e = easeOutCubic(lt);
+      p.x = tx;
+      const midY = sy + (ty - sy) * 0.5;
+      p.y = midY + (ty - midY) * e;
+      p.angle = Math.PI / 2;
     }
     p.scale = 1 - 0.35 * easeInOutCubic(t);
     if (t >= 1) {
       state.parkedAt.push({ x: tx, y: ty, scale: 0.6, angle: Math.PI / 2 });
       state.phase = 'idle';
       p.visible = false;
+      state.prevAngle = null;
       setTimeout(nextQuestion, 800);
     }
-  } else if (state.phase === 'passthru') {
-    // Continue flying left off-screen
-    const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInCubic(t);
-    const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    const tx = -100;
-    p.x = sx + (tx - sx) * e;
-    p.y = sy;
-    p.angle = Math.PI; // keep pointing left
-    p.scale = 1 - 0.2 * t;
-    if (t >= 1) {
-      p.visible = false;
-      state.phase = 'idle';
-      setTimeout(nextQuestion, 200);
-    }
   } else if (state.phase === 'flyaway') {
-    // Climb away upward-left
+    // Smooth climb out - no stopping, gain altitude and fly off screen
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInCubic(t);
+    const e = easeInOutCubic(t);
     const sx = state.flyFrom.x, sy = state.flyFrom.y;
-    const tx = -80;
-    const ty = -80;
+    // Fly upward-left with a smooth arc
+    const tx = sx - W * 0.6;
+    const ty = -120;
     p.x = sx + (tx - sx) * e;
-    p.y = sy + (ty - sy) * e;
-    p.angle = lerpAngle(Math.PI, Math.PI + 0.6, easeOutCubic(t)); // nose up-left
-    p.scale = 1 - 0.4 * t;
+    // Arc upward with a curve
+    const midY = sy - H * 0.1;
+    p.y = sy + (midY - sy) * easeOutCubic(t) + (ty - midY) * easeInCubic(t);
+    // Smoothly pitch up
+    p.angle = lerpAngle(Math.PI, Math.PI + 0.7, easeOutCubic(t));
+    p.scale = 1 - 0.5 * easeInOutCubic(t);
     if (t >= 1) {
       p.visible = false;
       state.phase = 'idle';
-      setTimeout(nextQuestion, 200);
+      state.prevAngle = null;
+      setTimeout(nextQuestion, 300);
+    }
     }
   } else if (state.phase === 'parked') {
     // stay
@@ -358,7 +363,7 @@ function draw() {
 
   // UI overlays
   drawBanner();
-  if (state.phase === 'onstrip') drawCountdown();
+  if (state.phase === 'incoming' && state.clickEnabled) drawCountdown();
   drawTablePlacard();
 }
 
@@ -740,14 +745,19 @@ function drawBanner() {
 
 function drawCountdown() {
   const elapsed = performance.now() - state.phaseStart;
-  const remain = Math.max(0, 1 - elapsed / state.phaseDuration);
+  const t = elapsed / state.phaseDuration;
+  // Answer time starts at clickEnableAt and ends at 1.0
+  const answerStart = state.clickEnableAt || 0;
+  const answerProgress = Math.max(0, Math.min(1, (t - answerStart) / (1 - answerStart)));
+  const remain = 1 - answerProgress;
+  const totalAnswerMs = state.phaseDuration * (1 - answerStart);
+  const secs = Math.max(0, totalAnswerMs * remain) / 1000;
   const barMaxW = 140;
   const barH = 10;
   const p = state.plane;
   const planeTop = p.y - 40;
   const by = Math.round(planeTop - barH - 14);
   const bx = Math.round(p.x - barMaxW / 2);
-  const secs = Math.max(0, state.phaseDuration - elapsed) / 1000;
   ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
@@ -867,7 +877,7 @@ function onTimeout() {
   fb.className = 'feedback bad';
   state.mistakes.push({ a, b, correct, answer: null });
   state.flyFrom = { x: state.plane.x, y: state.plane.y };
-  setPhase('passthru');
+  setPhase('flyaway');
 }
 
 function startLanding(gate) {
