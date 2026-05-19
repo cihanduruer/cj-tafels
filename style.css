@@ -264,7 +264,7 @@ h1 { font-size: 2.4rem; margin: 10px 0 5px; text-shadow: 2px 2px 0 #fff; }
   margin: 0;
   max-width: none;
   border-radius: 0;
-  padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 10px);
+  padding: calc(env(safe-area-inset-top, 20px) + 24px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 10px);
   z-index: 50;
   display: flex;
   flex-direction: column;
