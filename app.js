@@ -173,7 +173,7 @@ function setPhase(phase) {
   state.plane.visible = true;
 
   if (phase === 'incoming') {
-    state.phaseDuration = 5000; // 5s slow entry to align with runway
+    state.phaseDuration = 3500; // 3.5s entry to align with runway
   } else if (phase === 'onstrip') {
     state.phaseDuration = 3000; // 3s flying along runway, user must answer
     state.clickEnabled = true;
@@ -208,7 +208,7 @@ function updatePlane(now) {
   if (state.phase === 'incoming') {
     // Enter from right side, descend and align horizontally with the runway
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeOutCubic(t);
+    const e = easeInOut(t);
     const startX = W + 60;
     const startY = H * 0.15;
     const endX = W * 0.82;  // right end of runway
@@ -217,7 +217,7 @@ function updatePlane(now) {
     p.y = startY + (endY - startY) * e;
     // Rotate from approach angle to horizontal (pointing left = PI)
     const approachAngle = Math.atan2(endY - startY, endX - startX);
-    p.angle = lerpAngle(approachAngle, Math.PI, easeOutCubic(t));
+    p.angle = lerpAngle(approachAngle, Math.PI, easeInOut(t));
     p.scale = 0.7 + 0.3 * e;
     if (t >= 1) setPhase('onstrip');
   } else if (state.phase === 'onstrip') {
