@@ -157,7 +157,28 @@ function setPhase(phase) {
   state.plane.visible = true;
 
   if (phase === 'incoming') {
-    state.phaseDuration = 3500; // 3.5s entry to align with runway
+    state.phaseDuration = 4000; // 4s realistic approach circuit
+    // Random spawn point (different directions each time)
+    const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
+    const runwayRight = W * 0.8; // threshold (right end of runway)
+    const spawns = [
+      { x: W + 80, y: H * 0.1 },   // top-right
+      { x: W + 80, y: H * 0.5 },   // mid-right
+      { x: W * 0.5, y: -80 },      // top-center
+      { x: W + 80, y: H * 0.8 },   // bottom-right
+      { x: W * 0.8, y: H + 80 },   // bottom
+    ];
+    const spawn = spawns[Math.floor(Math.random() * spawns.length)];
+    // Store approach path waypoints: spawn → base turn → final approach → threshold
+    const baseX = runwayRight + W * 0.15;
+    const baseY = runwayY + (spawn.y > runwayY ? -H * 0.18 : H * 0.18);
+    state.approachPath = [
+      { x: spawn.x, y: spawn.y },
+      { x: baseX, y: spawn.y > runwayY ? runwayY - H * 0.12 : runwayY + H * 0.12 },
+      { x: runwayRight + 30, y: runwayY },
+      { x: runwayRight, y: runwayY },
+    ];
+    state.plane.scale = 0.5;
   } else if (phase === 'onstrip') {
     state.phaseDuration = 3000; // 3s flying along runway, user must answer
     state.clickEnabled = true;
@@ -190,26 +211,35 @@ function updatePlane(now) {
   const runwayY = H * 0.45 + Math.max(28, H * 0.06) / 2;
 
   if (state.phase === 'incoming') {
-    // Enter from right side, descend and align horizontally with the runway
+    // Follow the approach path (Catmull-Rom-like through waypoints)
     const t = Math.min(elapsed / state.phaseDuration, 1);
-    const e = easeInOut(t);
-    const startX = W + 60;
-    const startY = H * 0.15;
-    const endX = W * 0.75;  // right end of runway
-    const endY = runwayY;
-    p.x = startX + (endX - startX) * e;
-    p.y = startY + (endY - startY) * e;
-    // Rotate from approach angle to horizontal (pointing left = PI)
-    const approachAngle = Math.atan2(endY - startY, endX - startX);
-    p.angle = lerpAngle(approachAngle, Math.PI, easeInOut(t));
-    p.scale = 0.7 + 0.3 * e;
+    const path = state.approachPath;
+    const n = path.length - 1;
+    const segment = Math.min(Math.floor(t * n), n - 1);
+    const lt = (t * n) - segment;
+    const e = easeInOut(lt);
+    const from = path[segment];
+    const to = path[segment + 1];
+    p.x = from.x + (to.x - from.x) * e;
+    p.y = from.y + (to.y - from.y) * e;
+    // Point nose in direction of travel
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const targetAngle = Math.atan2(dy, dx);
+    // On last segment, smoothly align to PI (pointing left for landing)
+    if (segment === n - 1) {
+      p.angle = lerpAngle(targetAngle, Math.PI, easeOutCubic(lt));
+    } else {
+      p.angle = targetAngle;
+    }
+    p.scale = 0.5 + 0.5 * easeOutCubic(t);
     if (t >= 1) setPhase('onstrip');
   } else if (state.phase === 'onstrip') {
     // Fly along runway from right to left over 3 seconds (aligned horizontal)
     const t = Math.min(elapsed / state.phaseDuration, 1);
     const e = easeInOutCubic(t);
-    const startX = W * 0.75;
-    const endX = W * 0.25;
+    const startX = W * 0.8;
+    const endX = W * 0.2;
     p.x = startX + (endX - startX) * e;
     p.y = runwayY;
     p.angle = Math.PI; // nose pointing left
