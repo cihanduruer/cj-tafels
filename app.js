@@ -365,50 +365,7 @@ function drawCloud(x, y, s) {
   ctx.fill();
 }
 
-function drawTerminal(groundY) {
-  const w = Math.min(70, W * 0.10);
-  const topY = 70;
-  const h = H - topY - 10;
-  const x = 0;
-  const y = topY;
-  // building
-  ctx.fillStyle = '#e8e8e8';
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, w, h);
-  // roof strip
-  ctx.fillStyle = '#143b5e';
-  ctx.fillRect(x, y - 6, w + 4, 10);
-  // control tower on top-right of terminal
-  const tw = 22, th = 70;
-  const tx = x + w - tw - 6;
-  const ty = y - th + 6;
-  ctx.fillStyle = '#ccd';
-  ctx.fillRect(tx, ty, tw, th);
-  ctx.fillStyle = '#143b5e';
-  ctx.fillRect(tx - 4, ty - 12, tw + 8, 16);
-  ctx.fillStyle = '#5fb4d9';
-  ctx.fillRect(tx - 2, ty - 8, tw + 4, 8);
-  // windows column
-  ctx.fillStyle = '#5fb4d9';
-  const winW = Math.max(18, w - 16), winH = 18, winGap = 10;
-  let yy = y + 14;
-  while (yy + winH < y + h - 14) {
-    ctx.fillRect(x + (w - winW) / 2, yy, winW, winH);
-    yy += winH + winGap;
-  }
-  // vertical AIRPORT sign
-  ctx.save();
-  ctx.translate(x + w / 2, y + h - 50);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = '#143b5e';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('✈ AIRPORT', 0, 0);
-  ctx.restore();
-}
+function drawTerminal(groundY) {\n  // Large terminal building at the bottom of the scene\n  const bh = Math.min(90, H * 0.16);\n  const bw = W * 0.65;\n  const bx = (W - bw) / 2;\n  const by = H - bh;\n  // building body\n  ctx.fillStyle = '#e0e4e8';\n  ctx.fillRect(bx, by, bw, bh);\n  ctx.strokeStyle = '#888';\n  ctx.lineWidth = 2;\n  ctx.strokeRect(bx, by, bw, bh);\n  // roof line\n  ctx.fillStyle = '#143b5e';\n  ctx.fillRect(bx - 4, by - 8, bw + 8, 10);\n  // windows row\n  ctx.fillStyle = '#5fb4d9';\n  const winW = 20, winH = 28, winGap = 12;\n  const winCount = Math.floor((bw - 30) / (winW + winGap));\n  const winStartX = bx + (bw - winCount * (winW + winGap) + winGap) / 2;\n  for (let i = 0; i < winCount; i++) {\n    ctx.fillRect(winStartX + i * (winW + winGap), by + 16, winW, winH);\n  }\n  // AIRPORT sign\n  ctx.fillStyle = '#143b5e';\n  ctx.font = 'bold 14px sans-serif';\n  ctx.textAlign = 'center';\n  ctx.textBaseline = 'middle';\n  ctx.fillText('✈ AIRPORT', bx + bw / 2, by + bh - 14);\n\n  // Control tower (right side of terminal)\n  const tw = 30, th = 100;\n  const tx = bx + bw - tw - 20;\n  const ty = by - th + 10;\n  // tower shaft\n  ctx.fillStyle = '#ccd';\n  ctx.fillRect(tx + 6, ty + 20, tw - 12, th - 20);\n  ctx.strokeStyle = '#888';\n  ctx.lineWidth = 1.5;\n  ctx.strokeRect(tx + 6, ty + 20, tw - 12, th - 20);\n  // tower cab (glass observation room)\n  ctx.fillStyle = '#143b5e';\n  ctx.fillRect(tx - 4, ty, tw + 8, 22);\n  ctx.fillStyle = '#5fb4d9';\n  ctx.fillRect(tx - 2, ty + 4, tw + 4, 14);\n  // beacon on top\n  ctx.fillStyle = '#ef476f';\n  ctx.beginPath();\n  ctx.arc(tx + tw / 2, ty - 5, 4, 0, Math.PI * 2);\n  ctx.fill();\n}
 
 function drawTaxiways(groundY) {
   if (!state.gates.length) return;
