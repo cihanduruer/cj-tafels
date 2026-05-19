@@ -311,10 +311,20 @@ function draw() {
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // Distant clouds
-  drawCloud(W * 0.15, H * 0.15, 0.8);
-  drawCloud(W * 0.7, H * 0.1, 1.1);
-  drawCloud(W * 0.45, H * 0.22, 0.6);
+  // Drifting clouds (slow horizontal movement, wrap around)
+  const now = performance.now() / 1000;
+  const cloudDefs = [
+    { baseX: 0.15, y: 0.15, s: 0.9, speed: 8 },
+    { baseX: 0.70, y: 0.10, s: 1.3, speed: 5 },
+    { baseX: 0.45, y: 0.22, s: 0.7, speed: 11 },
+    { baseX: 0.85, y: 0.30, s: 1.0, speed: 6 },
+  ];
+  cloudDefs.forEach((c) => {
+    const span = W + 200;
+    let x = (c.baseX * W - now * c.speed) % span;
+    if (x < -100) x += span;
+    drawCloud(x, H * c.y, c.s);
+  });
 
   // Ground (grass)
   const groundY = H * 0.62;
